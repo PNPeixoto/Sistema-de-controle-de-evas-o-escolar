@@ -1,0 +1,55 @@
+package com.peixoto.usuario.infrastructure.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
+@Entity
+@Table(name = "alunos")
+@Builder
+public class Aluno {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "nome", length = 100)
+    private String nome;
+
+    @Column(name = "escola")
+    private String escola;
+
+    @Column(name = "data_nascimento")
+    private LocalDateTime dataNascimento;
+
+    private String cor;
+    private String escolaridade;
+    private Boolean aee;
+    private String turno;
+    private Boolean defasagem;
+    private String beneficios;
+
+
+
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = "aluno_id")
+    private List<Endereco> enderecos;
+
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = "aluno_id")
+    private List<Telefone> telefones;
+
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = "aluno_id")
+    private List<Filiacao> filiacao;
+
+
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = "aluno_id")
+    private List<OcorrenciaEvasao> historicoEvasao;
+}
