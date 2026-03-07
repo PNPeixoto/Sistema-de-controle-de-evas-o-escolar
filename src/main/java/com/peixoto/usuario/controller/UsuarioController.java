@@ -29,12 +29,12 @@ public class UsuarioController {
         return ResponseEntity.ok(usuarioService.autenticarUsuario(usuarioDTO));
     }
 
-    @GetMapping
+    @GetMapping("/email")
     public ResponseEntity<UsuarioDTO> buscaUsuarioPorEmail(@RequestParam("email") String email) {
         return ResponseEntity.ok(usuarioService.buscarUsuarioPorEmail(email));
     }
 
-    @DeleteMapping("/{email}")
+    @DeleteMapping("/email")
     public ResponseEntity<Void> deletaUsuarioPorEmail(@PathVariable String email) {
         usuarioService.deletaUsuarioPorEmail(email);
         return ResponseEntity.ok().build();
