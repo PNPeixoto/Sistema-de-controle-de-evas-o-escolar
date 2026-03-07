@@ -9,6 +9,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 
 import java.io.IOException;
 
@@ -35,21 +36,24 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
         // Verifica se o cabeçalho existe e começa com "Bearer "
         if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
-            // Extrai o token JWT do cabeçalho
-            final String token = authorizationHeader.substring(7);
-            // Extrai o nome de usuário do token JWT
+
+            // 1. Extrai o que vem depois de "Bearer " e remove espaços extras ou repetições acidentais
+            String token = authorizationHeader.substring(7).trim().replace("Bearer ", "");
+
+            // 2. Extrai o e-mail do token
             final String username = jwtUtil.extractEmailToken(token);
 
-            // Se o nome de usuário não for nulo e o usuário não estiver autenticado ainda
+            // 3. Validação e Autenticação
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                // Carrega os detalhes do usuário a partir do nome de usuário
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                // Valida o token JWT
+
                 if (jwtUtil.validateToken(token, username)) {
-                    // Cria um objeto de autenticação com as informações do usuário
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                             userDetails, null, userDetails.getAuthorities());
-                    // Define a autenticação no contexto de segurança
+
+                    // Adiciona detalhes da requisição (IP, sessão) ao objeto de autenticação
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
             }
