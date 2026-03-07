@@ -1,20 +1,18 @@
 package com.peixoto.usuario.controller;
 
 import com.peixoto.usuario.business.UsuarioService;
+import com.peixoto.usuario.business.dto.LoginEtapa1DTO;
+import com.peixoto.usuario.business.dto.LoginEtapa2DTO;
 import com.peixoto.usuario.business.dto.UsuarioDTO;
-import com.peixoto.usuario.infrastructure.entity.Aluno;
-import com.peixoto.usuario.infrastructure.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/usuario")
 @RequiredArgsConstructor
-
 public class UsuarioController {
 
     private final UsuarioService usuarioService;
@@ -24,10 +22,28 @@ public class UsuarioController {
         return ResponseEntity.ok(usuarioService.salvaUsuario(usuarioDTO));
     }
 
-    @PostMapping("/login")
-    public ResponseEntity<String> login(@RequestBody UsuarioDTO usuarioDTO) {
-        return ResponseEntity.ok(usuarioService.autenticarUsuario(usuarioDTO));
+    // ==========================================
+    // NOVAS ROTAS DE LOGIN EM 2 ETAPAS
+    // ==========================================
+
+    @PostMapping("/login/etapa1")
+    public ResponseEntity<Map<String, String>> loginEtapa1(@RequestBody LoginEtapa1DTO dto) {
+        String nomeEscola = usuarioService.validarEscola(dto);
+        // Retorna um JSON simples: {"escolaNome": "C.M. Machado de Assis"}
+        return ResponseEntity.ok(Map.of("escolaNome", nomeEscola));
     }
+
+    @PostMapping("/login/etapa2")
+    public ResponseEntity<String> loginEtapa2(@RequestBody LoginEtapa2DTO dto) {
+        System.out.println("E-mail recebido: " + dto.email());
+        System.out.println("Senha recebida: " + dto.senhaIndividual()); // SE ISSO IMPRIMIR NULL, O REACT MANDOU ERRADO!
+        // Retorna o Token JWT Final (Bearer ...)
+        return ResponseEntity.ok(usuarioService.validarsenhaIndividual(dto));
+    }
+
+    // ==========================================
+    // ROTAS PROTEGIDAS
+    // ==========================================
 
     @GetMapping("/email")
     public ResponseEntity<UsuarioDTO> buscaUsuarioPorEmail(@RequestParam("email") String email) {
@@ -35,7 +51,7 @@ public class UsuarioController {
     }
 
     @DeleteMapping("/email")
-    public ResponseEntity<Void> deletaUsuarioPorEmail(@PathVariable String email) {
+    public ResponseEntity<Void> deletaUsuarioPorEmail(@RequestParam("email") String email) {
         usuarioService.deletaUsuarioPorEmail(email);
         return ResponseEntity.ok().build();
     }
@@ -45,7 +61,4 @@ public class UsuarioController {
                                                          @RequestHeader("Authorization") String token) {
         return ResponseEntity.ok(usuarioService.atualizaDadosUsuario(token, dto));
     }
-
-
-
 }

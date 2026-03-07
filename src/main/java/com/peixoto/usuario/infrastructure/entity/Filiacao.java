@@ -17,6 +17,7 @@ public class Filiacao {
     private String mae;
     private String pai;
     private String responsavel;
+    private String telefoneResponsável;
 
     @ManyToOne
     @JoinColumn(name = "aluno_id")

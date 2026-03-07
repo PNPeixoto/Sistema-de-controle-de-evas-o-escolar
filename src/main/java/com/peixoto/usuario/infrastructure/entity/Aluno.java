@@ -18,10 +18,10 @@ public class Aluno {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "nome", length = 100)
-    private String nome;
+    @Column(nullable = false)
+    private String nomeCompleto;
 
-    @Column(name = "escola")
+    @Column(nullable = false)
     private String escola;
 
     @Column(name = "data_nascimento")

@@ -1,6 +1,8 @@
 package com.peixoto.usuario.business;
 
 import com.peixoto.usuario.business.converter.UsuarioConverter;
+import com.peixoto.usuario.business.dto.LoginEtapa1DTO;
+import com.peixoto.usuario.business.dto.LoginEtapa2DTO;
 import com.peixoto.usuario.business.dto.UsuarioDTO;
 import com.peixoto.usuario.infrastructure.entity.Usuario;
 import com.peixoto.usuario.infrastructure.exceptions.ConflictException;
@@ -19,44 +21,58 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class UsuarioService {
 
-
     private final UsuarioRepository usuarioRepository;
     private final UsuarioConverter usuarioConverter;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
 
-
     public UsuarioDTO salvaUsuario(UsuarioDTO usuarioDTO) {
         emailExiste(usuarioDTO.getEmail());
 
         // Criptografa as senhas antes de salvar
-
         usuarioDTO.setSenhaEscola(passwordEncoder.encode(usuarioDTO.getSenhaEscola()));
+        // Atualizado: Usando o novo código de 32 caracteres em vez do PIN
         usuarioDTO.setSenhaIndividual(passwordEncoder.encode(usuarioDTO.getSenhaIndividual()));
 
         Usuario usuario = usuarioConverter.paraUsuario(usuarioDTO);
         return usuarioConverter.paraUsuarioDTO(usuarioRepository.save(usuario));
     }
 
+    // =========================================================
+    // AUTENTICAÇÃO EM DOIS NÍVEIS (SEPARADOS)
+    // =========================================================
 
-    // Autenticação em Dois Níveis
+    // ETAPA 1: Retorna apenas o nome da escola para o Front-end
+    public String validarEscola(LoginEtapa1DTO dto) {
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(dto.email(), dto.senhaEscola())
+            );
+            Usuario usuario = (Usuario) authentication.getPrincipal();
+            return usuario.getEscolaNome();
+        } catch (Exception e) {
+            throw new UnauthorizedException("Credenciais da escola incorretas.");
+        }
+    }
 
-    public String autenticarUsuario(UsuarioDTO usuarioDTO) {
-        // Validação Nível 1: Email e Senha da Escola
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(usuarioDTO.getEmail(), usuarioDTO.getSenhaEscola())
-        );
+    // ETAPA 2: Valida o código do servidor e gera o JWT Final
+    public String validarsenhaIndividual(LoginEtapa2DTO dto) {
+        Usuario usuario = usuarioRepository.findByEmail(dto.email())
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado: " + dto.email()));
 
-        // Validação Nível 2: Senha Individual (PIN) manual:
+        // Compara o código de 32 caracteres digitado com o Hash do banco
 
-        Usuario usuario = (Usuario) authentication.getPrincipal();
-        if (!passwordEncoder.matches(usuarioDTO.getSenhaIndividual(), usuario.getSenhaIndividual())) {
-            throw new UnauthorizedException("PIN individual incorreto.");
+        if (!passwordEncoder.matches(dto.senhaIndividual(), usuario.getSenhaIndividual())) {
+            throw new UnauthorizedException("Código de acesso do servidor inválido.");
         }
 
         return "Bearer " + jwtUtil.generateToken(usuario.getEmail());
     }
+
+    // =========================================================
+    // MÉTODOS AUXILIARES E CRUD
+    // =========================================================
 
     public void emailExiste(String email) {
         if (usuarioRepository.existsByEmail(email)) {
@@ -78,18 +94,15 @@ public class UsuarioService {
     public UsuarioDTO atualizaDadosUsuario(String token, UsuarioDTO dto) {
         String emailToken = jwtUtil.extractEmailToken(token.substring(7));
 
-
-
         Usuario usuarioEntity = usuarioRepository.findByEmail(emailToken)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não localizado"));
 
         // Se houver nova senha escolar, criptografa
-
         if (dto.getSenhaEscola() != null) {
             dto.setSenhaEscola(passwordEncoder.encode(dto.getSenhaEscola()));
         }
-        // Se houver novo PIN, criptografa
 
+        // Se houver novo código de acesso, criptografa
         if (dto.getSenhaIndividual() != null) {
             dto.setSenhaIndividual(passwordEncoder.encode(dto.getSenhaIndividual()));
         }
