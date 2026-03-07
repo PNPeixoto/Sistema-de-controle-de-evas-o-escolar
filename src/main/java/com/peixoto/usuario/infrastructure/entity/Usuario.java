@@ -24,7 +24,8 @@ public class Usuario implements UserDetails {
     @Column(unique = true)
     private String email;
     private String senhaEscola;    // Nível 1
-    private String senhaIndividual; // Nível 2 (PIN)
+    @Column(name = "senha_individual", length = 255)
+    private String senhaIndividual;
 
     @Enumerated(EnumType.STRING)
     private Cargo cargo;
