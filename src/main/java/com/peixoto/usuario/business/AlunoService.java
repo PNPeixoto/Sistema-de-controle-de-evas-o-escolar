@@ -21,6 +21,21 @@ public class AlunoService {
     public Aluno salvaAluno(AlunoDTO dto) {
         Aluno aluno = alunoConverter.paraEntity(dto);
 
+        if (aluno.getEnderecos() != null) {
+            aluno.getEnderecos().forEach(endereco -> endereco.setAluno(aluno));
+        }
+
+        if (aluno.getTelefones() != null) {
+            aluno.getTelefones().forEach(telefone -> telefone.setAluno(aluno));
+        }
+
+        if (aluno.getFiliacao() != null) {
+            aluno.getFiliacao().forEach(filiacao -> filiacao.setAluno(aluno));
+        }
+
+        if (aluno.getHistoricoEvasao() != null) {
+            aluno.getHistoricoEvasao().forEach(evasao -> evasao.setAluno(aluno));
+        }
         // Salva tudo em cascata (Aluno -> Endereços -> Ocorrências -> Ações)
 
             return alunoRepository.save(aluno);

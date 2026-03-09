@@ -14,7 +14,7 @@ public class AlunoConverter {
 
     public Aluno paraEntity(AlunoDTO dto) {
         return Aluno.builder()
-                .nomeCompleto(dto.getNome())
+                .nomeCompleto(dto.getNomeCompleto())
                 .escola(dto.getEscola())
                 .dataNascimento(dto.getDataNascimento())
                 .cor(dto.getCor())

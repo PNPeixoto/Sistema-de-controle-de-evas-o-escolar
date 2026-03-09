@@ -1,5 +1,6 @@
 package com.peixoto.usuario.infrastructure.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -26,5 +27,10 @@ public class Endereco {
     private String cidade;
     @Column(name = "usuario_id")
     private Long usuario_id;
+
+    @JsonIgnore
+    @ManyToOne
+    @JoinColumn(name = "aluno_id")
+    private Aluno aluno;
 
 }
