@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import DashboardLayout from './pages/Dashboard';
 import CadastrarAluno from './pages/CadastrarAluno';
+import ConsultarAluno from './pages/ConsultarAluno';
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
     const token = localStorage.getItem('token');
@@ -16,7 +17,9 @@ export default function App() {
             <Route path="/" element={<Login />} />
 
             {/* Rotas Agrupadas do Dashboard */}
+
             <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
+
                 {/* Rota Padrão: /dashboard */}
                 <Route index element={
                     <div>
@@ -25,9 +28,10 @@ export default function App() {
                     </div>
                 } />
 
-                {/* Rota Filha: /dashboard/cadastrar-aluno */}
+                {/* Rota Filha: /dashboard */}
 
                 <Route path="cadastrar-aluno" element={<CadastrarAluno />} />
+                <Route path="consultar-aluno" element={<ConsultarAluno />} />
             </Route>
         </Routes>
     );

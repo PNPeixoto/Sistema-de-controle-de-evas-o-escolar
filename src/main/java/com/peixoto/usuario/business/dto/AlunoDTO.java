@@ -7,6 +7,11 @@ import lombok.*;
 
 import java.util.List;
 import java.time.LocalDateTime;
+import com.fasterxml.jackson.annotation.JsonFormat;
+
+
+
+
 @Getter
 @Setter
 @AllArgsConstructor
@@ -20,10 +25,10 @@ public class AlunoDTO {
     private String escola;
 
     @NotBlank(message = "Nome é obrigatório")
-    private String nome;
+    private String nomeCompleto;
 
     @NotNull(message = "A data de nascimento é obrigatória")
-    @JsonFormat(pattern = "dd/MM/yyyy") //
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss") //
     private LocalDateTime dataNascimento;
 
     private String cor;

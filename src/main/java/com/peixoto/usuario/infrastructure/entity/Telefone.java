@@ -1,5 +1,6 @@
 package com.peixoto.usuario.infrastructure.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -19,6 +20,9 @@ public class Telefone {
     private String numero;
     @Column(name = "ddd", length = 3)
     private String ddd;
-    @Column(name = "usuario_id")
-    private Long usuario_id;
+
+    @JsonIgnore
+    @ManyToOne
+    @JoinColumn(name = "aluno_id")
+    private Aluno aluno;
 }
