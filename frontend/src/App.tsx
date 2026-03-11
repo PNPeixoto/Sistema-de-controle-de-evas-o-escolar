@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import DashboardLayout from './pages/Dashboard';
 import CadastrarAluno from './pages/CadastrarAluno';
 import ConsultarAluno from './pages/ConsultarAluno';
+import RegistrarEvasao from './pages/RegistrarEvasao';
 
 function ProtectedRoute({ children }: { children: JSX.Element }) {
     const token = localStorage.getItem('token');
@@ -28,10 +29,12 @@ export default function App() {
                     </div>
                 } />
 
+
                 {/* Rota Filha: /dashboard */}
 
                 <Route path="cadastrar-aluno" element={<CadastrarAluno />} />
                 <Route path="consultar-aluno" element={<ConsultarAluno />} />
+                <Route path="registrar-evasao" element={<RegistrarEvasao />} />
             </Route>
         </Routes>
     );

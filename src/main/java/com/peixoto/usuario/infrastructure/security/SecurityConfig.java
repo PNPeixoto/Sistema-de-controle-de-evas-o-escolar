@@ -56,18 +56,32 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorize -> authorize
-                        // 2. Libera a requisição "invisível" (OPTIONS) que o navegador faz por segurança
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // 3. Atualizado para liberar TUDO que vier depois de /login (etapa1 e etapa2)
-                        .requestMatchers("/usuario/login/**").permitAll()
+                // 2. Libera a requisição "invisível" (OPTIONS) que o navegador faz por segurança
 
-                        // Rotas antigas mantidas
-                        .requestMatchers(HttpMethod.GET, "/auth").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/usuario").permitAll()
-                        .requestMatchers("/usuario/**").authenticated()
-                        .anyRequest().authenticated()
-                )
+
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                // 3. Atualizado para liberar TUDO que vier depois de /login (etapa1 e etapa2)
+
+                .requestMatchers("/usuario/login/**").permitAll()
+
+                // Rotas mantidas
+
+                .requestMatchers(HttpMethod.GET, "/auth").permitAll()
+                .requestMatchers(HttpMethod.POST, "/usuario").permitAll()
+
+                // Libera a rota de erro interno do Spring (Evita falsos 403)
+                .requestMatchers("/error").permitAll()
+
+                // Mapeando as rotas principais do seu sistema
+
+                .requestMatchers("/evasao/**").authenticated()
+                .requestMatchers("/aluno/**").authenticated()
+
+                .requestMatchers("/usuario/**").authenticated()
+                .anyRequest().authenticated()
+        )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
