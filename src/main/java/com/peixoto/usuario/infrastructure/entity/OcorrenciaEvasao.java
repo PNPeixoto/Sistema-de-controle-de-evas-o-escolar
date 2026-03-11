@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,6 +25,22 @@ public class OcorrenciaEvasao {
 
     private Integer quantidadeFaltas;
 
+
+    private String motivoAfastamento;
+
+
+    @Column(columnDefinition = "TEXT")
+    private String encaminhamentosLaudos;
+
+    @Column(columnDefinition = "TEXT")
+    private String conclusao;
+
+    private LocalDate dataAssinaturaDiretor;
+
+    private String assinaturaDiretor;
+
+    // ------------------------------------
+
     @OneToMany(mappedBy = "ocorrencia", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<AcaoTomada> acoes = new ArrayList<>();
 
@@ -31,4 +48,5 @@ public class OcorrenciaEvasao {
     @ManyToOne
     @JoinColumn(name = "aluno_id")
     private Aluno aluno;
+
 }

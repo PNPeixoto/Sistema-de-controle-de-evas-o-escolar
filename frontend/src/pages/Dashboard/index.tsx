@@ -13,7 +13,7 @@ export default function DashboardLayout() {
             {/* MENU LATERAL (SIDEBAR) */}
             <aside className="w-64 bg-slate-800 text-white flex flex-col">
                 <div className="p-6 border-b border-slate-700">
-                    <h2 className="text-xl font-bold">Controle Escolar</h2>
+                    <h2 className="text-xl font-bold">Sistema Virtual FICAI</h2>
                     <p className="text-sm text-slate-400 mt-1">Painel da Unidade</p>
                 </div>
 
@@ -21,7 +21,7 @@ export default function DashboardLayout() {
                     <Link to="/dashboard" className="block p-3 rounded hover:bg-slate-700 transition">Início</Link>
                     <Link to="/dashboard/cadastrar-aluno" className="block p-3 rounded hover:bg-slate-700 transition bg-slate-700/50">Cadastrar Aluno</Link>
                     <Link to="/dashboard/consultar-aluno" className="block p-3 rounded hover:bg-slate-700 transition text-slate-400">Consultar Aluno</Link>
-                    <Link to="/dashboard" className="block p-3 rounded hover:bg-slate-700 transition text-slate-400">Registrar Evasão</Link>
+                    <Link to="/dashboard/registrar-evasao" className="block p-3 rounded hover:bg-slate-700 transition text-slate-400">Registrar Evasão</Link>
                     <Link to="/dashboard" className="block p-3 rounded hover:bg-slate-700 transition text-slate-400">Exportar Dados</Link>
                 </nav>
 

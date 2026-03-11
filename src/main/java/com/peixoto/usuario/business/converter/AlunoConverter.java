@@ -24,7 +24,7 @@ public class AlunoConverter {
                 .defasagem(dto.getDefasagem())
                 .beneficios(dto.getBeneficios())
 
-                // Converte as listas simples
+                // Converte as listas
 
                 .enderecos(dto.getEnderecos().stream().map(this::paraEndereco).collect(Collectors.toList()))
                 .telefones(dto.getTelefones().stream().map(this::paraTelefone).collect(Collectors.toList()))
@@ -41,7 +41,7 @@ public class AlunoConverter {
         ocorrencia.setMesFaltas(dto.getMesFaltas());
         ocorrencia.setQuantidadeFaltas(dto.getQuantidadeFaltas());
 
-        // Mapeia as ações e vincula cada ação
+        // Mapeia as ações e vincula 
 
         if (dto.getAcoes() != null) {
             ocorrencia.setAcoes(dto.getAcoes().stream().map(acaoDto -> {
