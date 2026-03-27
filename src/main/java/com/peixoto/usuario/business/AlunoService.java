@@ -25,9 +25,6 @@ public class AlunoService {
             aluno.getEnderecos().forEach(endereco -> endereco.setAluno(aluno));
         }
 
-        if (aluno.getTelefones() != null) {
-            aluno.getTelefones().forEach(telefone -> telefone.setAluno(aluno));
-        }
 
         if (aluno.getFiliacao() != null) {
             aluno.getFiliacao().forEach(filiacao -> filiacao.setAluno(aluno));
@@ -39,6 +36,11 @@ public class AlunoService {
         // Salva tudo em cascata (Aluno -> Endereços -> Ocorrências -> Ações)
 
             return alunoRepository.save(aluno);
+    }
+
+    @Transactional
+    public void deletarAluno(Long id) {
+        alunoRepository.deleteById(id);
     }
 
     public List<Aluno> buscarTodosPorEscola(String escola) {

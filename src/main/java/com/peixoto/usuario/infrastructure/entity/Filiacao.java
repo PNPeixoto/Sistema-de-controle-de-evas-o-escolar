@@ -18,7 +18,7 @@ public class Filiacao {
     private String mae;
     private String pai;
     private String responsavel;
-    private String telefoneResponsável;
+    private String telefoneResponsavel;
 
     @JsonIgnore
     @ManyToOne
