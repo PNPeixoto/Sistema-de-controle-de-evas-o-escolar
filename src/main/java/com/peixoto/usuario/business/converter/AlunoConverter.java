@@ -17,6 +17,7 @@ public class AlunoConverter {
                 .nomeCompleto(dto.getNomeCompleto())
                 .escola(dto.getEscola())
                 .dataNascimento(dto.getDataNascimento())
+                .sexo(dto.getSexo())
                 .cor(dto.getCor())
                 .escolaridade(dto.getEscolaridade())
                 .aee(dto.getAee())
@@ -27,7 +28,6 @@ public class AlunoConverter {
                 // Converte as listas
 
                 .enderecos(dto.getEnderecos().stream().map(this::paraEndereco).collect(Collectors.toList()))
-                .telefones(dto.getTelefones().stream().map(this::paraTelefone).collect(Collectors.toList()))
                 .filiacao(dto.getFiliacao().stream().map(this::paraFiliacao).collect(Collectors.toList()))
 
                 // Converte a hierarquia de Evasão (Ocorrência -> Ações)
@@ -57,15 +57,25 @@ public class AlunoConverter {
 
     // Métodos auxiliares
 
-    private Endereco paraEndereco(EnderecoDTO d) { return Endereco.builder().rua(d.getRua()).numero(d.getNumero()).cidade(d.getCidade()).build(); }
-    private Telefone paraTelefone(TelefoneDTO d) { return Telefone.builder().numero(d.getNumero()).ddd(d.getDdd()).build(); }
+    private Endereco paraEndereco(EnderecoDTO d) {
+        return Endereco.builder()
+                .rua(d.getRua())
+                .numero(d.getNumero())
+                .bairro(d.getBairro())
+                .cidade(d.getCidade())
+                .build();
+    }
 
+    private Telefone paraTelefone(TelefoneDTO d) {
+        return Telefone.builder().numero(d.getNumero()).ddd(d.getDdd()).build();
+    }
 
     private Filiacao paraFiliacao(FiliacaoDTO d) {
         return Filiacao.builder()
                 .mae(d.getMae())
                 .pai(d.getPai())
                 .responsavel(d.getResponsavel())
+                .telefoneResponsavel(d.getTelefoneResponsavel())
                 .build();
     }
 }

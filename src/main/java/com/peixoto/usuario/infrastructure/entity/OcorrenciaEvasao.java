@@ -35,6 +35,18 @@ public class OcorrenciaEvasao {
     @Column(columnDefinition = "TEXT")
     private String conclusao;
 
+    @Column(name = "reincidente")
+    private Boolean reincidente;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "evasao_providencias", joinColumns = @JoinColumn(name = "ocorrencia_evasao_id"))
+    @Column(name = "providencia")
+    private List<String> providenciasAdotadas;
+
+    @Column(name = "outras_providencias")
+    private String outrasProvidencias;
+
+
     private LocalDate dataAssinaturaDiretor;
 
     private String assinaturaDiretor;

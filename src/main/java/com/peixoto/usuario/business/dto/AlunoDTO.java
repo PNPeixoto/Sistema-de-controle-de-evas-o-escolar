@@ -32,6 +32,7 @@ public class AlunoDTO {
     private LocalDateTime dataNascimento;
 
     private String cor;
+    private String sexo;
 
     private List<FiliacaoDTO> filiacao;
     private List<EnderecoDTO> enderecos;
