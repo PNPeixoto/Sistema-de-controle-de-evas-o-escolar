@@ -41,7 +41,6 @@ export default function PainelSemed() {
     // MOTOR DE INTELIGÊNCIA (Cruza os dados em tempo real)
     // ========================================================
     const {
-        alunosComEvasaoFiltrados,
         totalEvasoes,
         rankingEscolas,
         rankingBairros,
