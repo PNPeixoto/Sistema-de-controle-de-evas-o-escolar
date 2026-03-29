@@ -1,3 +1,4 @@
+import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
 // Importando das nossas novas pastas
@@ -10,7 +11,7 @@ import RegistrarEvasao from './pages/RegistrarEvasao';
 import PainelSemed from './pages/Semed/PainelSemed';
 import ConsultarUnidade from "./pages/Dashboard/ConsultarUnidade";
 
-function ProtectedRoute({ children }: { children: JSX.Element }) {
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const token = localStorage.getItem('token');
     return token ? children : <Navigate to="/" replace />;
 }
