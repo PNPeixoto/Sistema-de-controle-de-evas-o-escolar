@@ -1,14 +1,14 @@
-# Estágio 1: Prepara o ambiente e faz o Build usando o Gradle
-FROM eclipse-temurin:17-jdk AS build
+# Estágio 1: Prepara o ambiente e faz o Build usando o Gradle (Agora com Java 21!)
+FROM eclipse-temurin:21-jdk AS build
 WORKDIR /app
 COPY . .
 RUN chmod +x gradlew
 
-# A ULTIMA CARTADA: Trava a memória do Gradle em 256MB e desativa o daemon
+# Compila o projeto travando a memória para não estourar o limite do Render
 RUN ./gradlew build -x test --no-daemon -Dorg.gradle.jvmargs="-Xmx256m"
 
-# Estágio 2: Cria uma imagem mais leve apenas para rodar o app
-FROM eclipse-temurin:17-jre
+# Estágio 2: Cria uma imagem mais leve apenas para rodar o app (Java 21)
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/build/libs/*SNAPSHOT.jar app.jar
 
