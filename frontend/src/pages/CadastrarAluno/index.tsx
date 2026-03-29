@@ -6,24 +6,39 @@ interface Bairro {
     nome: string;
 }
 
+// BAIRROS EXTERNOS (Hardcoded por segurança contra XSS e praticidade)
+const bairrosRioDasOstras = [
+    "Âncora", "Cantagalo", "Centro", "Chácara Mariléa", "Cidade Beira Mar", "Costazul",
+    "Extensão do Bosque", "Jardim Bela Vista", "Jardim Campomar", "Jardim Mariléa",
+    "Mar do Norte", "Nova Cidade", "Nova Esperança", "Operário", "Ouro Verde",
+    "Parque Zabulão", "Recreio", "Rocha Leão", "Village"
+].sort();
+
+const bairrosQuissama = [
+    "Alto Grande", "Barra do Furado", "Canto de Santo Antônio", "Carmo",
+    "Caxias", "Centro", "Conde de Araruama", "Machadinha", "Morro Alto",
+    "Penha", "Piteiras", "Santa Catarina", "São Garabato"
+].sort();
+
 export default function CadastrarAluno() {
     const [passo, setPasso] = useState(1);
     const [carregando, setCarregando] = useState(false);
     const escolaLogada = localStorage.getItem('escolaNome') || '';
 
-    const [listaBairros, setListaBairros] = useState<Bairro[]>([]);
+    // Bairros de Macaé vêm do Back-End
+    const [listaBairrosMacae, setListaBairrosMacae] = useState<Bairro[]>([]);
 
     useEffect(() => {
-        buscarBairros();
+        buscarBairrosMacae();
     }, []);
 
-    const buscarBairros = async () => {
+    const buscarBairrosMacae = async () => {
         try {
             const token = localStorage.getItem('token');
             const resposta = await api.get('/bairros', {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setListaBairros(resposta.data);
+            setListaBairrosMacae(resposta.data);
         } catch (error) {
             console.error("Erro ao carregar a lista de bairros", error);
         }
@@ -46,7 +61,6 @@ export default function CadastrarAluno() {
     const [outroBeneficio, setOutroBeneficio] = useState('');
 
     const [endereco, setEndereco] = useState({ rua: '', numero: '', bairro: '', cidade: 'Macaé' });
-
     const [filiacao, setFiliacao] = useState({ mae: '', pai: '', responsavel: '', telefoneResponsavel: '' });
 
     const toggleBeneficio = (beneficio: string) => {
@@ -181,6 +195,12 @@ export default function CadastrarAluno() {
                             <div>
                                 <label className="block text-sm font-medium text-slate-700">Escolaridade (Série/Ano) *</label>
                                 <select value={aluno.escolaridade} onChange={e => setAluno({ ...aluno, escolaridade: e.target.value })} className="w-full p-3 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none bg-white" >
+                                    <optgroup label="Educação Infantil">
+                                        <option value="Maternal I">Maternal I</option>
+                                        <option value="Maternal II">Maternal II</option>
+                                        <option value="Pré I">Pré I</option>
+                                        <option value="Pré II">Pré II</option>
+                                    </optgroup>
                                     <optgroup label="Ensino Fundamental I">
                                         <option value="1º Ano - Ensino Fundamental I">1º Ano</option>
                                         <option value="2º Ano - Ensino Fundamental I">2º Ano</option>
@@ -193,6 +213,11 @@ export default function CadastrarAluno() {
                                         <option value="7º Ano - Ensino Fundamental II">7º Ano</option>
                                         <option value="8º Ano - Ensino Fundamental II">8º Ano</option>
                                         <option value="9º Ano - Ensino Fundamental II">9º Ano</option>
+                                    </optgroup>
+                                    <optgroup label="Ensino Médio">
+                                        <option value="1º Ano - Ensino Médio">1º Ano</option>
+                                        <option value="2º Ano - Ensino Médio">2º Ano</option>
+                                        <option value="3º Ano - Médio">3º Ano</option>
                                     </optgroup>
                                 </select>
                             </div>
@@ -248,42 +273,14 @@ export default function CadastrarAluno() {
                     <div className="space-y-6 animate-fadeIn">
                         <h3 className="text-lg font-semibold text-slate-700 border-b pb-2 mb-4">Localização</h3>
                         <div className="grid grid-cols-4 gap-4">
-                            <div className="col-span-3">
-                                <label className="block text-sm font-medium text-slate-700">Logradouro (Rua, Av) *</label>
-                                <input type="text" required value={endereco.rua} onChange={e => setEndereco({ ...endereco, rua: e.target.value })} className="w-full p-3 border border-slate-300 rounded outline-none" />
-                            </div>
-                            <div className="col-span-1">
-                                <label className="block text-sm font-medium text-slate-700">Número *</label>
-                                <input type="number" required value={endereco.numero} onChange={e => setEndereco({ ...endereco, numero: e.target.value })} className="w-full p-3 border border-slate-300 rounded outline-none" />
-                            </div>
 
-                            {/* ========================================== */}
-                            {/* NOVO: BAIRRO BLINDADO COMO SELECT          */}
-                            {/* ========================================== */}
-                            <div className="col-span-2 relative">
-                                <label className="block text-sm font-medium text-slate-700">Bairro *</label>
-                                <select
-                                    required
-                                    value={endereco.bairro}
-                                    onChange={e => setEndereco({ ...endereco, bairro: e.target.value })}
-                                    className="w-full p-3 border border-slate-300 rounded bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                                >
-                                    <option value="" disabled>Selecione um bairro da lista...</option>
-                                    {listaBairros.map((bairro) => (
-                                        <option key={bairro.id} value={bairro.nome}>{bairro.nome}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* ========================================== */}
-                            {/* NOVO: CIDADE BLINDADA SÓ COM 3 OPÇÕES      */}
-                            {/* ========================================== */}
-                            <div className="col-span-2">
-                                <label className="block text-sm font-medium text-slate-700">Cidade *</label>
+                            {/* CIDADE VEM PRIMEIRO PARA DEFINIR O BAIRRO */}
+                            <div className="col-span-4 md:col-span-2">
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Cidade *</label>
                                 <select
                                     required
                                     value={endereco.cidade}
-                                    onChange={e => setEndereco({ ...endereco, cidade: e.target.value })}
+                                    onChange={e => setEndereco({ ...endereco, cidade: e.target.value, bairro: '' })} // Reseta o bairro ao trocar a cidade!
                                     className="w-full p-3 border border-slate-300 rounded bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                                 >
                                     <option value="" disabled>Selecione a cidade...</option>
@@ -292,6 +289,43 @@ export default function CadastrarAluno() {
                                     <option value="Quissamã">Quissamã</option>
                                 </select>
                             </div>
+
+                            {/* BAIRRO DEPENDE DA CIDADE SELECIONADA */}
+                            <div className="col-span-4 md:col-span-2 relative">
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Bairro *</label>
+                                <select
+                                    required
+                                    value={endereco.bairro}
+                                    onChange={e => setEndereco({ ...endereco, bairro: e.target.value })}
+                                    disabled={!endereco.cidade} // Fica desativado se não escolher cidade
+                                    className="w-full p-3 border border-slate-300 rounded bg-white outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                >
+                                    <option value="" disabled>Selecione um bairro da lista...</option>
+
+                                    {endereco.cidade === 'Macaé' && listaBairrosMacae.map((bairro) => (
+                                        <option key={bairro.id} value={bairro.nome}>{bairro.nome}</option>
+                                    ))}
+
+                                    {endereco.cidade === 'Rio das Ostras' && bairrosRioDasOstras.map((bairro) => (
+                                        <option key={bairro} value={bairro}>{bairro}</option>
+                                    ))}
+
+                                    {endereco.cidade === 'Quissamã' && bairrosQuissama.map((bairro) => (
+                                        <option key={bairro} value={bairro}>{bairro}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="col-span-3">
+                                <label className="block text-sm font-medium text-slate-700 mt-2">Logradouro (Rua, Av) *</label>
+                                <input type="text" required value={endereco.rua} onChange={e => setEndereco({ ...endereco, rua: e.target.value })} className="w-full p-3 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500" />
+                            </div>
+
+                            <div className="col-span-1">
+                                <label className="block text-sm font-medium text-slate-700 mt-2">Número *</label>
+                                <input type="number" required value={endereco.numero} onChange={e => setEndereco({ ...endereco, numero: e.target.value })} className="w-full p-3 border border-slate-300 rounded outline-none focus:ring-2 focus:ring-blue-500" />
+                            </div>
+
                         </div>
                     </div>
                 )}
