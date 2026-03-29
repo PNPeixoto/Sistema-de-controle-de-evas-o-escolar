@@ -3,15 +3,13 @@ FROM eclipse-temurin:17-jdk AS build
 WORKDIR /app
 COPY . .
 RUN chmod +x gradlew
-RUN ./gradlew build -x test
+# A mágica acontece aqui: --no-daemon economiza a RAM do Render!
+RUN ./gradlew build -x test --no-daemon
 
 # Estágio 2: Cria uma imagem mais leve apenas para rodar o app
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 COPY --from=build /app/build/libs/*SNAPSHOT.jar app.jar
 
-# Libera a porta 8080 (padrão do Spring Boot)
 EXPOSE 8080
-
-# Comando para iniciar o servidor
 ENTRYPOINT ["java", "-jar", "app.jar"]
