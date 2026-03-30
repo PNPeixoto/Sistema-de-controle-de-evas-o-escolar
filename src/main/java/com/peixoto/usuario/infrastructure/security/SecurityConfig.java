@@ -94,12 +94,15 @@ public class SecurityConfig {
     // CONFIGURAÇÃO DO CORS (Quem pode acessar o back-end)
     // =========================================================
     @Bean
-
     public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
         org.springframework.web.cors.CorsConfiguration configuration = new org.springframework.web.cors.CorsConfiguration();
 
-        // Libera a porta do seu React no Vite
-        configuration.setAllowedOrigins(java.util.List.of("http://localhost:5173"));
+        // AQUI ESTÁ A CHAVE DE SEGURANÇA!
+        // Liberamos estritamente o seu PC e a sua Vercel. Qualquer outro site do mundo será bloqueado.
+        configuration.setAllowedOrigins(java.util.List.of(
+                "http://localhost:5173",
+                "https://sistema-de-controle-de-evas-o-escol-gamma.vercel.app"
+        ));
 
         // Libera os métodos
         configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
