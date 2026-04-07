@@ -5,6 +5,8 @@ import com.peixoto.usuario.business.dto.AlunoDTO;
 import com.peixoto.usuario.infrastructure.entity.Aluno;
 import com.peixoto.usuario.infrastructure.repository.AlunoRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +19,8 @@ public class AlunoService {
     private final AlunoRepository alunoRepository;
     private final AlunoConverter alunoConverter;
 
+    // Destrói o cache da escola específica quando um aluno novo é salvo
+    @CacheEvict(value = "alunos_escola", key = "#result.escola")
     @Transactional
     public Aluno salvaAluno(AlunoDTO dto) {
         Aluno aluno = alunoConverter.paraEntity(dto);
@@ -25,7 +29,6 @@ public class AlunoService {
             aluno.getEnderecos().forEach(endereco -> endereco.setAluno(aluno));
         }
 
-
         if (aluno.getFiliacao() != null) {
             aluno.getFiliacao().forEach(filiacao -> filiacao.setAluno(aluno));
         }
@@ -33,16 +36,19 @@ public class AlunoService {
         if (aluno.getHistoricoEvasao() != null) {
             aluno.getHistoricoEvasao().forEach(evasao -> evasao.setAluno(aluno));
         }
-        // Salva tudo em cascata (Aluno -> Endereços -> Ocorrências -> Ações)
 
-            return alunoRepository.save(aluno);
+        return alunoRepository.save(aluno);
     }
 
+    // Destrói o cache geral de alunos ao deletar um registro
+    @CacheEvict(value = "alunos_escola", allEntries = true)
     @Transactional
     public void deletarAluno(Long id) {
         alunoRepository.deleteById(id);
     }
 
+    // A MÁGICA ACONTECE AQUI: Guarda o retorno na memória RAM do servidor
+    @Cacheable(value = "alunos_escola", key = "#escola")
     public List<Aluno> buscarTodosPorEscola(String escola) {
         return alunoRepository.findByEscolaIgnoreCase(escola);
     }

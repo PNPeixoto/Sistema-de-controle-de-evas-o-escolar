@@ -16,6 +16,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 
 @Service
 @RequiredArgsConstructor
@@ -27,12 +29,10 @@ public class UsuarioService {
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
 
+    @CacheEvict(value = "usuario_email", key = "#usuarioDTO.email")
     public UsuarioDTO salvaUsuario(UsuarioDTO usuarioDTO) {
         emailExiste(usuarioDTO.getEmail());
-
-        // Criptografa as senhas antes de salvar
         usuarioDTO.setSenhaEscola(passwordEncoder.encode(usuarioDTO.getSenhaEscola()));
-        // Atualizado: Usando o novo código de 32 caracteres em vez do PIN
         usuarioDTO.setSenhaIndividual(passwordEncoder.encode(usuarioDTO.getSenhaIndividual()));
 
         Usuario usuario = usuarioConverter.paraUsuario(usuarioDTO);
@@ -80,6 +80,7 @@ public class UsuarioService {
         }
     }
 
+    @Cacheable(value = "usuario_email", key = "#email")
     public UsuarioDTO buscarUsuarioPorEmail(String email) {
         return usuarioConverter.paraUsuarioDTO(
                 usuarioRepository.findByEmail(email)
@@ -87,22 +88,22 @@ public class UsuarioService {
         );
     }
 
+    @CacheEvict(value = "usuario_email", key = "#email")
     public void deletaUsuarioPorEmail(String email) {
         usuarioRepository.deleteByEmail(email);
     }
 
+    @CacheEvict(value = "usuario_email", key = "#result.email")
     public UsuarioDTO atualizaDadosUsuario(String token, UsuarioDTO dto) {
         String emailToken = jwtUtil.extractEmailToken(token.substring(7));
 
         Usuario usuarioEntity = usuarioRepository.findByEmail(emailToken)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não localizado"));
 
-        // Se houver nova senha escolar, criptografa
         if (dto.getSenhaEscola() != null) {
             dto.setSenhaEscola(passwordEncoder.encode(dto.getSenhaEscola()));
         }
 
-        // Se houver novo código de acesso, criptografa
         if (dto.getSenhaIndividual() != null) {
             dto.setSenhaIndividual(passwordEncoder.encode(dto.getSenhaIndividual()));
         }

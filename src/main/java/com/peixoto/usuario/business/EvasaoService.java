@@ -6,6 +6,7 @@ import com.peixoto.usuario.infrastructure.entity.Aluno;
 import com.peixoto.usuario.infrastructure.entity.OcorrenciaEvasao;
 import com.peixoto.usuario.infrastructure.repository.AlunoRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,8 @@ public class EvasaoService {
 
     private final AlunoRepository alunoRepository;
 
+    // Destrói o cache de alunos daquela escola sempre que uma evasão for registrada
+    @CacheEvict(value = "alunos_escola", key = "#result.aluno.escola")
     @Transactional
     public OcorrenciaEvasao registrarEvasao(Long alunoId, OcorrenciaEvasaoDTO dto) {
         // 1. Busca o aluno
@@ -31,34 +34,25 @@ public class EvasaoService {
         ocorrencia.setMotivoAfastamento(dto.getMotivoAfastamento());
         ocorrencia.setEncaminhamentosLaudos(dto.getEncaminhamentosLaudos());
         ocorrencia.setConclusao(dto.getConclusao());
-
-        // ---> AS NOSSAS TRÊS NOVIDADES AQUI <---
         ocorrencia.setReincidente(dto.getReincidente());
         ocorrencia.setProvidenciasAdotadas(dto.getProvidenciasAdotadas());
         ocorrencia.setOutrasProvidencias(dto.getOutrasProvidencias());
 
-        // Amarra a ocorrência ao aluno
         ocorrencia.setAluno(aluno);
 
-        // 3. Mapeia a Lista de Ações (A mágica da tabela acao_tomada)
+        // 3. Mapeia a Lista de Ações
         if (dto.getAcoes() != null && !dto.getAcoes().isEmpty()) {
             List<AcaoTomada> listaDeAcoes = dto.getAcoes().stream().map(acaoDto -> {
                 AcaoTomada acao = new AcaoTomada();
-
-                // Pega a data já formatada certinha
                 acao.setDataAcao(acaoDto.getDataAcao());
-
-                // Pega o texto da variável acaoTomada e salva na Entidade
                 acao.setDescricao(acaoDto.getAcaoTomada());
-
-                acao.setOcorrencia(ocorrencia); // Amarra a ação à ocorrência!
+                acao.setOcorrencia(ocorrencia);
                 return acao;
             }).collect(Collectors.toList());
 
             ocorrencia.setAcoes(listaDeAcoes);
         }
 
-        // 4. Salva no banco (O Cascade vai salvar a Evasão, as Providências e as Ações juntas)
         aluno.getHistoricoEvasao().add(ocorrencia);
         alunoRepository.save(aluno);
 
