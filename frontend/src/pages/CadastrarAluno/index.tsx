@@ -1,3 +1,4 @@
+import { useAuth } from '../../hooks/useAuth';
 import { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 
@@ -23,7 +24,8 @@ const bairrosQuissama = [
 export default function CadastrarAluno() {
     const [passo, setPasso] = useState(1);
     const [carregando, setCarregando] = useState(false);
-    const escolaLogada = localStorage.getItem('escolaNome') || '';
+    const { usuario } = useAuth();
+    const escolaLogada = usuario?.escolaNome || '';
 
     // Bairros de Macaé vêm do Back-End
     const [listaBairrosMacae, setListaBairrosMacae] = useState<Bairro[]>([]);
@@ -34,10 +36,7 @@ export default function CadastrarAluno() {
 
     const buscarBairrosMacae = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const resposta = await api.get('/bairros', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const resposta = await api.get('/bairros');
             setListaBairrosMacae(resposta.data);
         } catch (error) {
             console.error("Erro ao carregar a lista de bairros", error);
@@ -139,8 +138,7 @@ export default function CadastrarAluno() {
         };
 
         try {
-            const token = localStorage.getItem('token');
-            await api.post('/aluno', payload, { headers: { Authorization: `Bearer ${token}` } });
+            await api.post('/aluno', payload);
             alert('Aluno matriculado com sucesso no sistema escolar!');
             window.location.reload();
         } catch (error: any) {

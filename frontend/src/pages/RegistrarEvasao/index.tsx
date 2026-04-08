@@ -1,3 +1,4 @@
+import { useAuth } from '../../hooks/useAuth';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
@@ -17,7 +18,8 @@ export default function RegistrarEvasao({ onClose }: { onClose?: () => void }) {
     // ==========================================
     const [listaAlunos, setListaAlunos] = useState<{id: number, nomeCompleto: string}[]>([]);
     const [alunoSelecionadoId, setAlunoSelecionadoId] = useState<number | ''>('');
-    const escolaLogada = localStorage.getItem('escolaNome') || '';
+    const { usuario } = useAuth();
+    const escolaLogada = usuario?.escolaNome || '';
 
     const mesesAno = [
         'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -46,10 +48,7 @@ export default function RegistrarEvasao({ onClose }: { onClose?: () => void }) {
 
     const buscarAlunos = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const resposta = await api.get(`/aluno/escola/${encodeURIComponent(escolaLogada)}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const resposta = await api.get(`/aluno/escola/${encodeURIComponent(escolaLogada)}`);
             setListaAlunos(resposta.data);
         } catch (error) {
             console.error("Erro ao buscar alunos", error);
@@ -121,10 +120,7 @@ export default function RegistrarEvasao({ onClose }: { onClose?: () => void }) {
         };
 
         try {
-            const token = localStorage.getItem('token');
-            await api.post(`/evasao/${alunoSelecionadoId}`, payload, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await api.post(`/evasao/${alunoSelecionadoId}`, payload);
 
             alert('Dossiê de Evasão (FICAI) registrado com sucesso!');
             window.location.reload();

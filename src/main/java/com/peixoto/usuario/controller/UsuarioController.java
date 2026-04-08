@@ -4,8 +4,20 @@ import com.peixoto.usuario.business.UsuarioService;
 import com.peixoto.usuario.business.dto.LoginEtapa1DTO;
 import com.peixoto.usuario.business.dto.LoginEtapa2DTO;
 import com.peixoto.usuario.business.dto.UsuarioDTO;
+import com.peixoto.usuario.infrastructure.exceptions.UnauthorizedException;
+import com.peixoto.usuario.infrastructure.security.RateLimitService;
+import com.peixoto.usuario.infrastructure.security.TokenBlacklistService;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -16,29 +28,110 @@ import java.util.Map;
 public class UsuarioController {
 
     private final UsuarioService usuarioService;
+    private final RateLimitService rateLimitService;
+    private final TokenBlacklistService tokenBlacklistService;
+
+    // Em produção (HTTPS) = true. Em localhost (HTTP) = false.
+    @Value("${app.security.cookie-secure:false}")
+    private boolean cookieSecure;
 
     @PostMapping
-    public ResponseEntity<UsuarioDTO> salvaUsuario(@RequestBody UsuarioDTO usuarioDTO) {
+    public ResponseEntity<UsuarioDTO> salvaUsuario(@Valid @RequestBody UsuarioDTO usuarioDTO) {
         return ResponseEntity.ok(usuarioService.salvaUsuario(usuarioDTO));
     }
 
     // ==========================================
-    // NOVAS ROTAS DE LOGIN EM 2 ETAPAS
+    // LOGIN EM 2 ETAPAS
     // ==========================================
 
     @PostMapping("/login/etapa1")
-    public ResponseEntity<Map<String, String>> loginEtapa1(@RequestBody LoginEtapa1DTO dto) {
-        String nomeEscola = usuarioService.validarEscola(dto);
-        // Retorna um JSON simples: {"escolaNome": "C.M. Machado de Assis"}
-        return ResponseEntity.ok(Map.of("escolaNome", nomeEscola));
+    public ResponseEntity<Map<String, String>> loginEtapa1(@RequestBody LoginEtapa1DTO dto,
+                                                            HttpServletRequest request) {
+        String ip = getClientIp(request);
+
+        if (rateLimitService.isBlocked(ip)) {
+            throw new UnauthorizedException("Muitas tentativas de login. Aguarde 15 minutos.");
+        }
+
+        try {
+            String nomeEscola = usuarioService.validarEscola(dto);
+            rateLimitService.resetAttempts(ip);
+            return ResponseEntity.ok(Map.of("escolaNome", nomeEscola));
+        } catch (Exception e) {
+            rateLimitService.recordAttempt(ip);
+            throw e;
+        }
     }
 
     @PostMapping("/login/etapa2")
-    public ResponseEntity<String> loginEtapa2(@RequestBody LoginEtapa2DTO dto) {
-        System.out.println("E-mail recebido: " + dto.email());
-        System.out.println("Senha recebida: " + dto.senhaIndividual()); // SE ISSO IMPRIMIR NULL, O REACT MANDOU ERRADO!
-        // Retorna o Token JWT Final (Bearer ...)
-        return ResponseEntity.ok(usuarioService.validarsenhaIndividual(dto));
+    public ResponseEntity<Map<String, String>> loginEtapa2(@RequestBody LoginEtapa2DTO dto,
+                                                            HttpServletRequest request,
+                                                            HttpServletResponse response) {
+        String ip = getClientIp(request);
+
+        if (rateLimitService.isBlocked(ip)) {
+            throw new UnauthorizedException("Muitas tentativas de login. Aguarde 15 minutos.");
+        }
+
+        try {
+            String tokenComBearer = usuarioService.validarsenhaIndividual(dto);
+            String tokenPuro = tokenComBearer.replace("Bearer ", "");
+
+            // Usa ResponseCookie (mais controle que Cookie do Servlet)
+            // Em localhost: Secure=false, SameSite=Lax (funciona em HTTP)
+            // Em produção: Secure=true, SameSite=None (funciona em HTTPS cross-origin)
+            ResponseCookie cookie = ResponseCookie.from("pnp_token", tokenPuro)
+                    .httpOnly(true)
+                    .secure(cookieSecure)
+                    .path("/")
+                    .maxAge(2 * 60 * 60)
+                    .sameSite(cookieSecure ? "None" : "Lax")
+                    .build();
+
+            response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+            rateLimitService.resetAttempts(ip);
+
+            return ResponseEntity.ok(Map.of("status", "authenticated"));
+        } catch (Exception e) {
+            rateLimitService.recordAttempt(ip);
+            throw e;
+        }
+    }
+
+    // ==========================================
+    // /me — Retorna dados do usuário logado
+    // ==========================================
+    @GetMapping("/me")
+    public ResponseEntity<UsuarioDTO> getUsuarioLogado() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return ResponseEntity.ok(usuarioService.buscarUsuarioPorEmail(auth.getName()));
+    }
+
+    // ==========================================
+    // /logout — Invalida o token
+    // ==========================================
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("pnp_token".equals(cookie.getName())) {
+                    tokenBlacklistService.blacklist(cookie.getValue());
+                    break;
+                }
+            }
+        }
+
+        // Apaga o cookie
+        ResponseCookie deleteCookie = ResponseCookie.from("pnp_token", "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .path("/")
+                .maxAge(0)
+                .sameSite(cookieSecure ? "None" : "Lax")
+                .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, deleteCookie.toString());
+        return ResponseEntity.ok().build();
     }
 
     // ==========================================
@@ -57,8 +150,16 @@ public class UsuarioController {
     }
 
     @PutMapping
-    public ResponseEntity<UsuarioDTO> atualizDadoUsuario(@RequestBody UsuarioDTO dto,
+    public ResponseEntity<UsuarioDTO> atualizDadoUsuario(@Valid @RequestBody UsuarioDTO dto,
                                                          @RequestHeader("Authorization") String token) {
         return ResponseEntity.ok(usuarioService.atualizaDadosUsuario(token, dto));
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }
