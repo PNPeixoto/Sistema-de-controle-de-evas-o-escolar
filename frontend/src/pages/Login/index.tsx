@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -13,6 +14,7 @@ export default function Login() {
     const [carregando, setCarregando] = useState(false);
 
     const navigate = useNavigate();
+    const { login } = useAuth();
 
     const handleLoginEtapa1 = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -36,18 +38,17 @@ export default function Login() {
         setCarregando(true);
 
         try {
-            // O backend agora retorna o token como HttpOnly Cookie
-            // NÃO salvamos nada no localStorage (proteção contra XSS)
-            await api.post('/usuario/login/etapa2', {
+            const resposta = await api.post('/usuario/login/etapa2', {
                 email: email,
                 senhaIndividual: senhaIndividual
             });
 
-            // REMOVIDO: localStorage.setItem('token', token);
-            // REMOVIDO: localStorage.setItem('escolaNome', escolaNome);
-            // REMOVIDO: localStorage.setItem('cargo', userResp.data.cargo);
+            // Aguarda salvar token E carregar dados do usuário ANTES de navegar
+            const token = resposta.data.token;
+            if (token) {
+                await login(token);
+            }
 
-            // Apenas navega — o cookie já está definido pelo backend
             navigate('/dashboard');
         } catch (error: any) {
             setErro(error.response?.data?.message || 'Código de acesso do servidor inválido.');
@@ -73,11 +74,11 @@ export default function Login() {
 
             <div className="flex items-center justify-center gap-6 mb-8 relative z-10 mt-[-5vh]">
                 <img src="/logo-padrao.png" alt="Prefeitura de Macaé"
-                    className="h-16 md:h-20 w-auto object-contain drop-shadow-2xl" />
+                     className="h-16 md:h-20 w-auto object-contain drop-shadow-2xl" />
                 <div className="h-12 md:h-14 w-px bg-slate-600/60 rounded-full"></div>
                 <div className="bg-white rounded-xl p-1.5 shadow-xl">
                     <img src="/logoceduc.jpeg" alt="CEDUC"
-                        className="h-12 md:h-14 w-auto object-contain rounded-lg" />
+                         className="h-12 md:h-14 w-auto object-contain rounded-lg" />
                 </div>
             </div>
 
@@ -99,19 +100,19 @@ export default function Login() {
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-2">E-mail Institucional</label>
                             <input type="email" required value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all text-slate-700"
-                                placeholder="servidor@prefeitura.rj.gov.br" />
+                                   onChange={(e) => setEmail(e.target.value)}
+                                   className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all text-slate-700"
+                                   placeholder="servidor@prefeitura.rj.gov.br" />
                         </div>
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-2">Senha da Unidade</label>
                             <input type="password" required value={senhaEscola}
-                                onChange={(e) => setSenhaEscola(e.target.value)}
-                                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all text-slate-700"
-                                placeholder="••••••••" />
+                                   onChange={(e) => setSenhaEscola(e.target.value)}
+                                   className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all text-slate-700"
+                                   placeholder="••••••••" />
                         </div>
                         <button type="submit" disabled={carregando}
-                            className="w-full bg-gradient-to-r from-blue-700 to-blue-600 hover:from-blue-800 hover:to-blue-700 text-white font-bold py-4 px-4 rounded-xl transition-all shadow-lg hover:shadow-blue-600/30 disabled:opacity-70 mt-4 text-lg">
+                                className="w-full bg-gradient-to-r from-blue-700 to-blue-600 hover:from-blue-800 hover:to-blue-700 text-white font-bold py-4 px-4 rounded-xl transition-all shadow-lg hover:shadow-blue-600/30 disabled:opacity-70 mt-4 text-lg">
                             {carregando ? 'Verificando unidade...' : 'Avançar →'}
                         </button>
                     </form>
@@ -127,18 +128,18 @@ export default function Login() {
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-2">Código de Acesso do Servidor</label>
                             <input type="password" required value={senhaIndividual}
-                                onChange={(e) => setSenhaIndividual(e.target.value)}
-                                className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/20 focus:border-blue-600 outline-none text-center tracking-[0.3em] font-mono transition-all text-xl"
-                                placeholder="INSIRA O CÓDIGO" />
+                                   onChange={(e) => setSenhaIndividual(e.target.value)}
+                                   className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-4 focus:ring-blue-500/20 focus:border-blue-600 outline-none text-center tracking-[0.3em] font-mono transition-all text-xl"
+                                   placeholder="INSIRA O CÓDIGO" />
                         </div>
 
                         <div className="flex gap-3 pt-2">
                             <button type="button" onClick={() => setEtapa(1)}
-                                className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-4 px-4 rounded-xl transition-colors border border-slate-200">
+                                    className="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-4 px-4 rounded-xl transition-colors border border-slate-200">
                                 Voltar
                             </button>
                             <button type="submit" disabled={carregando}
-                                className="w-2/3 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white font-bold py-4 px-4 rounded-xl transition-all shadow-lg hover:shadow-emerald-600/30 disabled:opacity-70 text-lg">
+                                    className="w-2/3 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white font-bold py-4 px-4 rounded-xl transition-all shadow-lg hover:shadow-emerald-600/30 disabled:opacity-70 text-lg">
                                 {carregando ? 'Entrando...' : 'Acessar ✓'}
                             </button>
                         </div>

@@ -31,8 +31,7 @@ public class UsuarioController {
     private final RateLimitService rateLimitService;
     private final TokenBlacklistService tokenBlacklistService;
 
-    // Em produção (HTTPS) = true. Em localhost (HTTP) = false.
-    @Value("${app.security.cookie-secure:false}")
+    @Value("${app.security.cookie-secure:true}")
     private boolean cookieSecure;
 
     @PostMapping
@@ -77,9 +76,7 @@ public class UsuarioController {
             String tokenComBearer = usuarioService.validarsenhaIndividual(dto);
             String tokenPuro = tokenComBearer.replace("Bearer ", "");
 
-            // Usa ResponseCookie (mais controle que Cookie do Servlet)
-            // Em localhost: Secure=false, SameSite=Lax (funciona em HTTP)
-            // Em produção: Secure=true, SameSite=None (funciona em HTTPS cross-origin)
+            // Tenta setar cookie (funciona com domínio + SSL válido)
             ResponseCookie cookie = ResponseCookie.from("pnp_token", tokenPuro)
                     .httpOnly(true)
                     .secure(cookieSecure)
@@ -87,11 +84,16 @@ public class UsuarioController {
                     .maxAge(2 * 60 * 60)
                     .sameSite(cookieSecure ? "None" : "Lax")
                     .build();
-
             response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+
             rateLimitService.resetAttempts(ip);
 
-            return ResponseEntity.ok(Map.of("status", "authenticated"));
+            // RETORNA O TOKEN NO BODY TAMBÉM
+            // O frontend salva em memória (não localStorage) como fallback
+            return ResponseEntity.ok(Map.of(
+                "status", "authenticated",
+                "token", tokenComBearer
+            ));
         } catch (Exception e) {
             rateLimitService.recordAttempt(ip);
             throw e;
@@ -99,7 +101,7 @@ public class UsuarioController {
     }
 
     // ==========================================
-    // /me — Retorna dados do usuário logado
+    // /me — Dados do usuário logado
     // ==========================================
     @GetMapping("/me")
     public ResponseEntity<UsuarioDTO> getUsuarioLogado() {
@@ -112,6 +114,7 @@ public class UsuarioController {
     // ==========================================
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
+        // Tenta blacklist do cookie
         if (request.getCookies() != null) {
             for (Cookie cookie : request.getCookies()) {
                 if ("pnp_token".equals(cookie.getName())) {
@@ -121,7 +124,13 @@ public class UsuarioController {
             }
         }
 
-        // Apaga o cookie
+        // Tenta blacklist do header
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            tokenBlacklistService.blacklist(authHeader.substring(7).trim());
+        }
+
+        // Apaga cookie
         ResponseCookie deleteCookie = ResponseCookie.from("pnp_token", "")
                 .httpOnly(true)
                 .secure(cookieSecure)
@@ -129,8 +138,8 @@ public class UsuarioController {
                 .maxAge(0)
                 .sameSite(cookieSecure ? "None" : "Lax")
                 .build();
-
         response.addHeader(HttpHeaders.SET_COOKIE, deleteCookie.toString());
+
         return ResponseEntity.ok().build();
     }
 
