@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,12 +23,8 @@ public class OcorrenciaEvasao {
     private Long id;
 
     private String mesFaltas;
-
     private Integer quantidadeFaltas;
-
-
     private String motivoAfastamento;
-
 
     @Column(columnDefinition = "TEXT")
     private String encaminhamentosLaudos;
@@ -46,12 +43,22 @@ public class OcorrenciaEvasao {
     @Column(name = "outras_providencias")
     private String outrasProvidencias;
 
-
     private LocalDate dataAssinaturaDiretor;
-
     private String assinaturaDiretor;
 
-    // ------------------------------------
+    // NOVO: Status da evasão (ABERTA ou RESOLVIDA)
+    @Column(name = "status", nullable = false)
+    @Builder.Default
+    private String status = "ABERTA";
+
+    // NOVO: Data em que foi resolvida
+    @Column(name = "data_resolucao")
+    private LocalDateTime dataResolucao;
+
+    // NOVO: Auditoria — quando foi criada
+    @Column(name = "criado_em", updatable = false)
+    @Builder.Default
+    private LocalDateTime criadoEm = LocalDateTime.now();
 
     @OneToMany(mappedBy = "ocorrencia", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<AcaoTomada> acoes = new ArrayList<>();
@@ -60,5 +67,4 @@ public class OcorrenciaEvasao {
     @ManyToOne
     @JoinColumn(name = "aluno_id")
     private Aluno aluno;
-
 }
