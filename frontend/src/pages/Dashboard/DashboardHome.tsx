@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
+import FicaiMensalButton from '../../components/FicaiMensalButton';
 
 export default function DashboardHome() {
     const { usuario } = useAuth();
