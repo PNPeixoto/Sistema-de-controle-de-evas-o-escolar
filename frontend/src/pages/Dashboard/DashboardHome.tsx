@@ -187,6 +187,7 @@ export default function DashboardHome() {
                         <Link to="/dashboard/cadastrar-aluno" className="w-full flex items-center justify-center gap-2 p-4 bg-blue-50 text-blue-700 font-bold rounded-lg hover:bg-blue-100 transition border border-blue-200">Novo Cadastro</Link>
                         <Link to="/dashboard/registrar-evasao" className="w-full flex items-center justify-center gap-2 p-4 bg-red-50 text-red-700 font-bold rounded-lg hover:bg-red-100 transition border border-red-200 shadow-sm">Registrar Evasão</Link>
                         <Link to="/dashboard/consultar-aluno" className="w-full flex items-center justify-center gap-2 p-4 bg-slate-50 text-slate-700 font-bold rounded-lg hover:bg-slate-100 transition border border-slate-300">Consultar Fichas</Link>
+                        <FicaiMensalButton />
                     </div>
                 </div>
             ) : (
