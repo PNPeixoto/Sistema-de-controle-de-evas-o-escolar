@@ -1,19 +1,9 @@
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 
-
-/**
- * Componente "Não possui FICAI este mês"
- *
- * Uso: <FicaiMensalButton /> no DashboardHome
- *
- * Funcionalidades:
- * - Verifica se já existe registro no mês atual
- * - Se houver evasões registradas no mês, botão fica desabilitado
- * - Exige aceitação do termo de consentimento
- * - Registra a declaração no banco com assinatura do diretor
- */
 export default function FicaiMensalButton() {
+    const { usuario } = useAuth();
     const [statusMes, setStatusMes] = useState<any>(null);
     const [carregando, setCarregando] = useState(true);
     const [mostrarModal, setMostrarModal] = useState(false);
@@ -22,23 +12,27 @@ export default function FicaiMensalButton() {
     const [erro, setErro] = useState('');
     const [sucesso, setSucesso] = useState('');
 
-    const mesAtual = new Date().toISOString().slice(0, 7); // "2026-04"
+    const mesAtual = new Date().toISOString().slice(0, 7);
     const nomeMes = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
+    // Só verifica quando o usuário estiver carregado
     useEffect(() => {
-        verificarMes();
-    }, []);
+        if (usuario) {
+            verificarMes();
+        } else {
+            setCarregando(false);
+        }
+    }, [usuario]);
 
     const verificarMes = async () => {
         try {
-            setCarregando(true);
             const resp = await api.get(`/ficai-mensal?mes=${mesAtual}`);
             setStatusMes(resp.data);
         } catch (error) {
             console.error('Erro ao verificar FICAI mensal:', error);
-        } finally {
-            setCarregando(false);
+            setStatusMes(null);
         }
+        setCarregando(false);
     };
 
     const registrarSemFicai = async () => {
@@ -68,14 +62,21 @@ export default function FicaiMensalButton() {
         }
     };
 
-    if (carregando) return null;
+    // Enquanto carrega, mostra placeholder ao invés de null
+    if (carregando) {
+        return (
+            <div className="w-full p-4 bg-slate-50 text-slate-400 font-medium rounded-lg border border-slate-200 text-center text-sm animate-pulse">
+                Verificando FICAI mensal...
+            </div>
+        );
+    }
 
     // Já registrado neste mês
     if (statusMes?.registrado && statusMes?.semFicai) {
         return (
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
                 <p className="text-emerald-700 font-bold text-sm">
-                    ✓ Declaração de ausência de FICAI registrada para {nomeMes}
+                    Declaração de ausência de FICAI registrada para {nomeMes}
                 </p>
                 <p className="text-emerald-600 text-xs mt-1">
                     Assinado por {statusMes.assinadoPor} em {statusMes.dataAssinatura}
@@ -90,10 +91,9 @@ export default function FicaiMensalButton() {
                 onClick={() => { setMostrarModal(true); setTermoAceito(false); setErro(''); }}
                 className="w-full flex items-center justify-center gap-2 p-4 bg-amber-50 text-amber-700 font-bold rounded-lg hover:bg-amber-100 transition border border-amber-200"
             >
-                <span>📋</span> Não possui FICAI este mês
+                Não possui FICAI este mês
             </button>
 
-            {/* MODAL DO TERMO DE CONSENTIMENTO */}
             {mostrarModal && (
                 <div className="fixed inset-0 bg-slate-900/60 z-50 flex justify-center items-center p-4 backdrop-blur-sm"
                      onClick={() => setMostrarModal(false)}>
