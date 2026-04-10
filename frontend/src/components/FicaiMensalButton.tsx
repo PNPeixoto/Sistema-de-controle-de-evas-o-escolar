@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { api } from '../../services/api';
-import FicaiMensalButton from '../../components/FicaiMensalButton';
+import { api } from '../services/api';
+
 
 /**
  * Componente "Não possui FICAI este mês"
