@@ -1,6 +1,3 @@
-
-Copiar
-
 import axios from 'axios';
 
 // Token em sessionStorage (sobrevive F5, morre ao fechar aba)
