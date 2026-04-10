@@ -1,29 +1,36 @@
+
+Copiar
+
 import axios from 'axios';
 
-// Token em memória (NÃO localStorage — mais seguro, some ao fechar aba)
-let memoryToken: string | null = null;
-
+// Token em sessionStorage (sobrevive F5, morre ao fechar aba)
 export function setToken(token: string | null) {
-    memoryToken = token;
+    if (token) {
+        sessionStorage.setItem('pnp_auth', token);
+    } else {
+        sessionStorage.removeItem('pnp_auth');
+    }
 }
 
 export function getToken(): string | null {
-    return memoryToken;
+    return sessionStorage.getItem('pnp_auth');
 }
 
 export function clearToken() {
-    memoryToken = null;
+    sessionStorage.removeItem('pnp_auth');
 }
 
 export const api = axios.create({
     baseURL: 'https://76.13.226.20',
-    withCredentials: true, // Tenta enviar cookie se existir
+    withCredentials: true,
 });
 
-// Interceptor: injeta token do memory como fallback se cookie não funcionar
+// Injeta token em toda requisição
 api.interceptors.request.use((config) => {
-    if (memoryToken) {
-        config.headers.Authorization = `Bearer ${memoryToken}`;
+    const token = getToken();
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
 });
+ 
