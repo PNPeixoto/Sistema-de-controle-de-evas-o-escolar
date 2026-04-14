@@ -1,3 +1,4 @@
+import { useAuth } from '../../hooks/useAuth';
 import { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 
@@ -17,21 +18,20 @@ export default function ConsultarAluno() {
     // NOVO: Estado para a barra de pesquisa
     const [termoPesquisa, setTermoPesquisa] = useState('');
 
-    const escolaLogada = localStorage.getItem('escolaNome') || '';
+    const { usuario } = useAuth();
+    const escolaLogada = usuario?.escolaNome || '';
 
     useEffect(() => { buscarAlunos(); }, []);
 
     const buscarAlunos = async () => {
         try {
             setCarregando(true);
-            const token = localStorage.getItem('token');
-            const cargo = localStorage.getItem('cargo');
 
-            const urlEndpoint = cargo === 'SEMED'
+            const urlEndpoint = usuario?.cargo === 'SEMED'
                 ? '/semed/alunos/todos'
                 : `/aluno/escola/${encodeURIComponent(escolaLogada)}`;
 
-            const resposta = await api.get(urlEndpoint, { headers: { Authorization: `Bearer ${token}` } });
+            const resposta = await api.get(urlEndpoint);
             setAlunos(resposta.data);
             setErro('');
         } catch (error: any) {
@@ -45,8 +45,7 @@ export default function ConsultarAluno() {
     const handleExcluirAluno = async (id: number, nome: string) => {
         if (window.confirm(`⚠️ ATENÇÃO!\n\nVocê tem certeza que deseja excluir o(a) aluno(a) ${nome}?\n\nIsso apagará permanentemente o cadastro e todas as FICAIs associadas a ele. Essa ação não pode ser desfeita.`)) {
             try {
-                const token = localStorage.getItem('token');
-                await api.delete(`/aluno/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+                await api.delete(`/aluno/${id}`);
                 alert('Aluno excluído com sucesso!');
                 buscarAlunos(); // Atualiza a lista na tela
             } catch (error) {
@@ -58,9 +57,7 @@ export default function ConsultarAluno() {
     const handleBaixarFicai = async (aluno: Aluno, evasaoId: number) => {
         try {
             setBaixandoPdf(true);
-            const token = localStorage.getItem('token');
             const resposta = await api.get(`/relatorios/ficai/${aluno.id}/${evasaoId}`, {
-                headers: { Authorization: `Bearer ${token}` },
                 responseType: 'blob'
             });
             const url = window.URL.createObjectURL(new Blob([resposta.data]));

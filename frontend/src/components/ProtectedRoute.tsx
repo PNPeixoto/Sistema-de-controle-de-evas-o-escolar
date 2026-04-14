@@ -1,13 +1,24 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-    const token = localStorage.getItem('token');
+    const { usuario, carregando } = useAuth();
 
-    // Se não houver token, manda de volta para o login
-    if (!token) {
+    if (carregando) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="text-slate-500 text-lg font-medium animate-pulse">
+                    Verificando sessão...
+                </div>
+            </div>
+        );
+    }
+
+    if (!usuario) {
         return <Navigate to="/" replace />;
     }
 
-    return children;
+    return <>{children}</>;
+
 };

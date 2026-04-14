@@ -24,8 +24,8 @@ export default function ConsultarUnidade() {
     const [alunoSelecionado, setAlunoSelecionado] = useState<Aluno | null>(null);
 
     // CARREGA OS STATUS DO CACHE (LOCALSTORAGE)
-    const [ficiaisBaixadas, setFiciaisBaixadas] = useState<number[]>(JSON.parse(localStorage.getItem('ficiaisBaixadas') || '[]'));
-    const [ficiaisResolvidas, setFiciaisResolvidas] = useState<number[]>(JSON.parse(localStorage.getItem('ficiaisResolvidas') || '[]'));
+    const [ficiaisBaixadas, setFiciaisBaixadas] = useState<number[]>(JSON.parse(sessionStorage.getItem('ficiaisBaixadas') || '[]'));
+    const [ficiaisResolvidas, setFiciaisResolvidas] = useState<number[]>(JSON.parse(sessionStorage.getItem('ficiaisResolvidas') || '[]'));
 
     useEffect(() => {
         carregarTodasAsEscolas();
@@ -34,8 +34,7 @@ export default function ConsultarUnidade() {
     const carregarTodasAsEscolas = async () => {
         try {
             setCarregandoEscolas(true);
-            const token = localStorage.getItem('token');
-            const resposta = await api.get('/escolas', { headers: { Authorization: `Bearer ${token}` } });
+            const resposta = await api.get('/escolas');
             setEscolas(Array.isArray(resposta.data) ? resposta.data : []);
         } catch (error) {
             console.error("Erro:", error);
@@ -49,8 +48,7 @@ export default function ConsultarUnidade() {
     const abrirEscola = async (nomeEscola: string) => {
         try {
             setCarregandoAlunos(true);
-            const token = localStorage.getItem('token');
-            const resposta = await api.get(`/aluno/escola/${encodeURIComponent(nomeEscola)}`, { headers: { Authorization: `Bearer ${token}` } });
+            const resposta = await api.get(`/aluno/escola/${encodeURIComponent(nomeEscola)}`);
             setAlunosSemed(Array.isArray(resposta.data) ? resposta.data : []);
             setEscolaAtiva(nomeEscola);
         } catch (error) {
@@ -72,10 +70,7 @@ export default function ConsultarUnidade() {
         try {
             const evasaoId = aluno.historicoEvasao[0]?.id;
             if (!evasaoId) return alert("FICAI não encontrada.");
-
-            const token = localStorage.getItem('token');
             const resposta = await api.get(`/relatorios/ficai/${aluno.id}/${evasaoId}`, {
-                headers: { Authorization: `Bearer ${token}` },
                 responseType: 'blob'
             });
 
@@ -91,7 +86,7 @@ export default function ConsultarUnidade() {
             if (!ficiaisBaixadas.includes(evasaoId)) {
                 const atualizadas = [...ficiaisBaixadas, evasaoId];
                 setFiciaisBaixadas(atualizadas);
-                localStorage.setItem('ficiaisBaixadas', JSON.stringify(atualizadas));
+                sessionStorage.setItem('ficiaisBaixadas', JSON.stringify(atualizadas));
             }
 
         } catch (error) {
@@ -104,7 +99,7 @@ export default function ConsultarUnidade() {
         if(window.confirm('Tem certeza que a frequência foi normalizada?')) {
             const atualizadas = [...ficiaisResolvidas, evasaoId];
             setFiciaisResolvidas(atualizadas);
-            localStorage.setItem('ficiaisResolvidas', JSON.stringify(atualizadas));
+            sessionStorage.setItem('ficiaisResolvidas', JSON.stringify(atualizadas));
         }
     };
 

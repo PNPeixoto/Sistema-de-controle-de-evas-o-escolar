@@ -4,6 +4,13 @@ import org.springframework.stereotype.Service;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Serviço de blacklist de tokens JWT.
+ * Quando o usuário faz logout, o token é adicionado à blacklist
+ * e rejeitado pelo JwtRequestFilter nas próximas requisições.
+ *
+ * NOTA: Em produção com múltiplas instâncias, substituir por Redis.
+ */
 @Service
 public class TokenBlacklistService {
 

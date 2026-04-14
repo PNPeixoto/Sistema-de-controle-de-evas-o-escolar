@@ -5,7 +5,7 @@ COPY . .
 RUN chmod +x gradlew
 
 # Compila o projeto travando a memória para não estourar o limite do Render
-RUN ./gradlew build -x test --no-daemon -Dorg.gradle.jvmargs="-Xmx256m"
+RUN ./gradlew build -x test --no-daemon
 
 # Estágio 2: Cria uma imagem mais leve apenas para rodar o app (Java 21)
 FROM eclipse-temurin:21-jre

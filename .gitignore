@@ -1,50 +1,30 @@
-cat > .gitignore << 'EOF'
-# ========================
-# SEGURANÇA
-# ========================
-src/main/resources/application.properties
-src/main/resources/application-prod.properties
-src/main/resources/application-secrets.properties
-*.env
-.env
-.env.*
-secrets.yml
-*.pem
-*.key
-*.jks
-*.keystore
-
-# ========================
-# JAVA / SPRING
-# ========================
-build/
-out/
-.gradle/
-!gradle/wrapper/gradle-wrapper.jar
-
-# ========================
-# NODE / REACT
-# ========================
+# Dependências
 node_modules/
-dist/
-.next/
-coverage/
+frontend/node_modules/
 
-# ========================
-# IDEs
-# ========================
+# Build
+build/
+frontend/dist/
+*.jar
+*.war
+
+# IDE
 .idea/
-.vscode/
 *.iml
-*.iws
-*.ipr
-.DS_Store
-Thumbs.db
+.vscode/
 
-# ========================
-# LOGS
-# ========================
+# Gradle
+.gradle/
+gradle-app.setting
+
+# Segredos
+.env
+*.env.local
+
+# Logs
 *.log
 logs/
-spring.log
-EOF
+
+# OS
+.DS_Store
+Thumbs.db

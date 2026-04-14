@@ -16,8 +16,7 @@ export default function PainelSemed() {
     const carregarBaseCompleta = async () => {
         try {
             setCarregando(true);
-            const token = localStorage.getItem('token');
-            const resp = await api.get('/semed/alunos/todos', { headers: { Authorization: `Bearer ${token}` } });
+            const resp = await api.get('/semed/alunos/todos');
             setAlunosBrutos(resp.data);
         } catch (error) {
             console.error("Erro ao puxar dados para o BI:", error);
@@ -27,8 +26,7 @@ export default function PainelSemed() {
     };
 
     const baixarExcel = async () => {
-        const token = localStorage.getItem('token');
-        const resp = await api.get('/semed/exportar', { headers: { Authorization: `Bearer ${token}` }, responseType: 'blob' });
+        const resp = await api.get('/semed/exportar', { responseType: 'blob' });
         const url = window.URL.createObjectURL(new Blob([resp.data]));
         const link = document.createElement('a');
         link.href = url;

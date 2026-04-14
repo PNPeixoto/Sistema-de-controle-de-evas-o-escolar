@@ -1,17 +1,12 @@
-import { useNavigate, Outlet, Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function DashboardLayout() {
-    const navigate = useNavigate();
     const location = useLocation();
+    const { usuario, logout } = useAuth();
 
-    const escolaLogada = localStorage.getItem('escolaNome') || 'Unidade Escolar';
-    const cargoLogado = localStorage.getItem('cargo') || 'ESCOLA';
-
-    const fazerLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('cargo');
-        navigate('/');
-    };
+    const escolaLogada = usuario?.escolaNome || 'Unidade Escolar';
+    const cargoLogado = usuario?.cargo || 'ESCOLA';
 
     const isActive = (path: string) => {
         if (path === '/dashboard' && location.pathname === '/dashboard') return true;
@@ -29,11 +24,10 @@ export default function DashboardLayout() {
     return (
         <div className="flex h-screen bg-slate-100 font-sans relative overflow-hidden">
 
-            {/* Fundo leve com a logo */}
             <div
                 className="absolute inset-0 z-0 pointer-events-none opacity-[0.04] mix-blend-multiply"
                 style={{
-                    backgroundImage: "url('/logoceduc.jpeg')", // Ajuste o caminho se necessário
+                    backgroundImage: "url('/logoceduc.jpeg')",
                     backgroundPosition: 'center',
                     backgroundRepeat: 'no-repeat',
                     backgroundSize: '50%'
@@ -42,7 +36,6 @@ export default function DashboardLayout() {
 
             <aside className="w-64 bg-slate-900 text-white flex flex-col shadow-xl z-10 relative">
                 <div className="p-5 border-b border-slate-800 flex flex-col items-center gap-4">
-                    {/* Logo da Prefeitura */}
                     <img src="/logo-padrao.png" alt="Prefeitura" className="h-20 w-auto object-contain drop-shadow-md" />
 
                     <div className="text-center w-full">
@@ -54,18 +47,13 @@ export default function DashboardLayout() {
                     </div>
                 </div>
 
-                {/* NAVEGAÇÃO / MENU */}
                 <nav className="flex-1 p-4 space-y-2 overflow-y-auto mt-2">
 
-                    {/* 1. VISÃO GERAL - APARECE PARA TODOS */}
                     <Link to="/dashboard" className={linkClass('/dashboard')}>
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
                         Visão Geral
                     </Link>
 
-                    {/* ======================================= */}
-                    {/* 2. MENU EXCLUSIVO PARA: ESCOLAS         */}
-                    {/* ======================================= */}
                     {cargoLogado !== 'SEMED' && (
                         <>
                             <Link to="/dashboard/cadastrar-aluno" className={linkClass('/cadastrar-aluno')}>
@@ -78,7 +66,6 @@ export default function DashboardLayout() {
                                 Registrar Evasão
                             </Link>
 
-                            {/* Escola vê a consulta local de alunos dela */}
                             <Link to="/dashboard/consultar-aluno" className={linkClass('/consultar-aluno')}>
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>
                                 Consultar Alunos
@@ -86,12 +73,8 @@ export default function DashboardLayout() {
                         </>
                     )}
 
-                    {/* ======================================= */}
-                    {/* 3. MENU EXCLUSIVO PARA: SEMED           */}
-                    {/* ======================================= */}
                     {cargoLogado === 'SEMED' && (
                         <>
-                            {/* SEMED vê a consulta macro (Pastas por Unidades) */}
                             <Link to="/dashboard/consultar-unidade" className={linkClass('/consultar-unidade')}>
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
                                 Consultar Unidades
@@ -106,14 +89,13 @@ export default function DashboardLayout() {
                 </nav>
 
                 <div className="p-4 border-t border-slate-800">
-                    <button onClick={fazerLogout} className="w-full flex items-center justify-center gap-2 p-2.5 text-red-400 hover:text-white hover:bg-red-600/90 rounded-lg transition-colors font-bold text-sm">
+                    <button onClick={logout} className="w-full flex items-center justify-center gap-2 p-2.5 text-red-400 hover:text-white hover:bg-red-600/90 rounded-lg transition-colors font-bold text-sm">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                         Sair do Sistema
                     </button>
                 </div>
             </aside>
 
-            {/* Onde as páginas são injetadas */}
             <main className="flex-1 p-8 overflow-y-auto relative z-10">
                 <Outlet />
             </main>
