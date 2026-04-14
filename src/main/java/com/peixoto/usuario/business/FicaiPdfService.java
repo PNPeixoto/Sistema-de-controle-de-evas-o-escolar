@@ -31,6 +31,9 @@ public class FicaiPdfService {
             PDAcroForm acroForm = pdfDocument.getDocumentCatalog().getAcroForm();
 
             if (acroForm != null) {
+                // ==========================================
+                // 1. DADOS PESSOAIS
+                // ==========================================
                 preencherCampo(acroForm, aluno.getNomeCompleto(), "nome_aluno", "NOME", "a) NOME:");
                 preencherCampo(acroForm, aluno.getEscola(), "escola", "unidade_escolar", "UNIDADE ESCOLAR:");
                 preencherCampo(acroForm, aluno.getEscolaridade(), "escolaridade", "ano_serie", "ANO/SÉRIE ESCOLAR:");
@@ -48,11 +51,15 @@ public class FicaiPdfService {
                     else if (sexo.startsWith("F")) marcarCheckbox(acroForm, "chk_sexo_f", "SEXO_F");
                 }
 
+                // FIliação
+
                 if (aluno.getFiliacao() != null && !aluno.getFiliacao().isEmpty()) {
                     var filiacao = aluno.getFiliacao().get(0);
                     preencherCampo(acroForm, filiacao.getMae(), "nome_mae", "mae", "MÃE:");
                     preencherCampo(acroForm, filiacao.getPai(), "nome_pai", "pai", "PAI:");
                     preencherCampo(acroForm, filiacao.getResponsavel(), "nome_responsavel", "responsavel", "RESPONSÁVEL:");
+
+                    //Telefone
                     preencherCampo(acroForm, filiacao.getTelefoneResponsavel(), "telefone_principal", "telefone", "TELEFONE DE CONTATO:");
                 }
 
@@ -60,14 +67,17 @@ public class FicaiPdfService {
                     var end = aluno.getEnderecos().get(0);
                     String rua = (end.getRua() != null) ? end.getRua().trim() : "";
                     String num = (end.getNumero() != null) ? String.valueOf(end.getNumero()) : "S/N";
-                    String bairro = (end.getBairro() != null && !"null".equals(end.getBairro())) ? end.getBairro().trim() : "";
-                    String cidade = (end.getCidade() != null && !"null".equals(end.getCidade())) ? end.getCidade().trim() : "";
+                    String bairro = (end.getBairro() != null && !end.getBairro().equals("null")) ? end.getBairro().trim() : "";
+                    String cidade = (end.getCidade() != null && !end.getCidade().equals("null")) ? end.getCidade().trim() : "";
 
                     String enderecoJunto = rua.isEmpty() ? "" : (rua + ", Nº " + num);
                     preencherCampo(acroForm, enderecoJunto, "endereco", "ENDEREÇO:", "ENDERECO", "endereco_completo");
                     preencherCampo(acroForm, bairro, "bairro", "BAIRRO:", "BAIRRO");
                     preencherCampo(acroForm, cidade, "cidade", "CIDADE:", "CIDADE");
                 }
+
+
+                // 2. CHECKBOXES (AEE, Turno, Benefícios)
 
                 if (aluno.getAee() != null && aluno.getAee()) marcarCheckbox(acroForm, "chk_aee_sim", "chk_aee");
                 else marcarCheckbox(acroForm, "chk_aee_nao");
@@ -102,6 +112,8 @@ public class FicaiPdfService {
                         if (ben.contains("NOVA VIDA")) marcarCheckbox(acroForm, "chk_ben_nova_vida");
                         if (ben.contains("BOLSA") || ben.contains("FAM")) {
                             marcarCheckbox(acroForm, "chk_ben_bolsa");
+
+                            // EXTRAÇÃO À PROVA DE FALHAS DO CÓDIGO NIS
                             if (ben.contains("JUSTIFICATIVA:")) {
                                 String codigo = ben.substring(ben.indexOf("JUSTIFICATIVA:") + 14).replaceAll("[^0-9]", "");
                                 preencherCampo(acroForm, codigo, "txt_codigo_bolsa", "codigo_bolsa");
@@ -110,6 +122,9 @@ public class FicaiPdfService {
                     }
                 }
 
+                // ==========================================
+                // 3. SEÇÕES DA FICAI (MÚLTIPLAS LINHAS)
+                // ==========================================
                 preencherCampo(acroForm, evasao.getMesFaltas(), "mes_faltas", "MÊS DAS FALTAS:");
                 preencherCampo(acroForm, String.valueOf(evasao.getQuantidadeFaltas()), "qtd_faltas", "numero_faltas");
 
@@ -125,6 +140,8 @@ public class FicaiPdfService {
                         else if (p.contains("RESPONS")) marcarCheckbox(acroForm, "chk_prov_conversa");
                         else if (p.contains("OUTRAS")) {
                             marcarCheckbox(acroForm, "chk_prov_outras");
+
+                            // Outras providências (Dividido em até 2 linhas caso o texto seja grande)
                             preencherCampoMultilinha(acroForm, evasao.getOutrasProvidencias(), "txt_prov_outras_1", "txt_prov_outras_2");
                         }
                     }
@@ -140,28 +157,42 @@ public class FicaiPdfService {
                     else if (motivo.contains("OUTRO") || !motivo.trim().isEmpty()) {
                         marcarCheckbox(acroForm, "chk_motivo_outros");
                         String textoLimpo = evasao.getMotivoAfastamento().replaceFirst("(?i)Outros:\\s*", "");
+
+                        // Outros Motivos (Dividido em até 2 linhas)
                         preencherCampoMultilinha(acroForm, textoLimpo, "txt_motivo_outros_1", "txt_motivo_outros_2");
                     }
                 }
 
+                // ENCAMINHAMENTOS (Múltiplas Linhas: 1, 2 e 3)
                 preencherCampoMultilinha(acroForm, evasao.getEncaminhamentosLaudos(), "encaminhamento1", "encaminhamento2", "encaminhamento3");
+
+                // CONCLUSÃO (Múltiplas Linhas: 1, 2, 3 e 4)
                 preencherCampoMultilinha(acroForm, evasao.getConclusao(), "conclusao1", "conclusao2", "conclusao3", "conclusao4");
 
+
+
+                // SEÇÃO IV - TABELA DE AÇÕES
+                // ==========================================
                 if (evasao.getAcoes() != null) {
                     int i = 1;
                     for (AcaoTomada acao : evasao.getAcoes()) {
                         if (i > 3) break;
+
                         if (acao.getDataAcao() != null) {
                             preencherCampo(acroForm, acao.getDataAcao().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), "acao_data_" + i);
                         }
+
                         String desc = acao.getDescricao().toUpperCase();
                         if (desc.contains("TELEFONE")) marcarCheckbox(acroForm, "chk_acao_" + i + "_telefone");
                         else if (desc.contains("VISITA")) marcarCheckbox(acroForm, "chk_acao_" + i + "_visita");
                         else if (desc.contains("MENSAGEM")) marcarCheckbox(acroForm, "chk_acao_" + i + "_mensagem");
                         else if (desc.contains("ATENDIMENTO") || desc.contains("RESPONS")) marcarCheckbox(acroForm, "chk_acao_" + i + "_atendimento");
 
+
                         String obsFinal = desc.contains(" - ") ? acao.getDescricao().substring(acao.getDescricao().indexOf(" - ") + 3) : acao.getDescricao();
+
                         preencherCampo(acroForm, obsFinal, "acao_obs_" + i);
+
                         i++;
                     }
                 }
@@ -174,37 +205,49 @@ public class FicaiPdfService {
             return outputStream.toByteArray();
 
         } catch (Exception e) {
-            log.error("Erro ao gerar PDF FICAI para aluno {}: {}", aluno.getNomeCompleto(), e.getMessage(), e);
             throw new RuntimeException("Erro ao gerar PDF: " + e.getMessage(), e);
         }
     }
 
+
+    // FUNÇÕES MÁGICAS DE PREENCHIMENTO E DIVISÃO DE LINHAS
+
+
+
     private void preencherCampoMultilinha(PDAcroForm form, String texto, String... nomesDasLinhas) {
-        if (texto == null || texto.trim().isEmpty() || "null".equals(texto)) return;
-        int maxCharsPorLinha = 85;
+        if (texto == null || texto.trim().isEmpty() || texto.equals("null")) return;
+
+        int maxCharsPorLinha = 85; // Limite de letras por linha do PDF
         String[] palavras = texto.split(" ");
         StringBuilder linhaAtual = new StringBuilder();
         int linhaIndex = 0;
 
         for (String palavra : palavras) {
+
+            // 1. A TESOURA: Se a palavra for uma "Tripa" gigante sem espaços (Teste do aaaa)
             while (palavra.length() > maxCharsPorLinha) {
                 if (linhaAtual.length() > 0) {
                     preencherCampo(form, linhaAtual.toString().trim(), nomesDasLinhas[linhaIndex]);
                     linhaIndex++;
                     linhaAtual = new StringBuilder();
-                    if (linhaIndex >= nomesDasLinhas.length) return;
+                    if (linhaIndex >= nomesDasLinhas.length) return; // Acabou o espaço
                 }
-                preencherCampo(form, palavra.substring(0, maxCharsPorLinha), nomesDasLinhas[linhaIndex]);
+                // Corta um pedaço exato do limite da linha
+                String pedaco = palavra.substring(0, maxCharsPorLinha);
+                preencherCampo(form, pedaco, nomesDasLinhas[linhaIndex]);
                 linhaIndex++;
-                if (linhaIndex >= nomesDasLinhas.length) return;
+                if (linhaIndex >= nomesDasLinhas.length) return; // Acabou o espaço
+
+                // O resto da palavra continua no loop
                 palavra = palavra.substring(maxCharsPorLinha);
             }
 
+            // 2. TEXTO NORMAL: Pula a linha se não couber
             if (linhaAtual.length() + palavra.length() + 1 > maxCharsPorLinha) {
                 if (linhaIndex < nomesDasLinhas.length) {
                     preencherCampo(form, linhaAtual.toString().trim(), nomesDasLinhas[linhaIndex]);
                     linhaIndex++;
-                    if (linhaIndex >= nomesDasLinhas.length) return;
+                    if (linhaIndex >= nomesDasLinhas.length) return; // Acabou o espaço
                 }
                 linhaAtual = new StringBuilder(palavra + " ");
             } else {
@@ -212,13 +255,14 @@ public class FicaiPdfService {
             }
         }
 
+        // Imprime o restinho que sobrou na última linha possível
         if (linhaAtual.length() > 0 && linhaIndex < nomesDasLinhas.length) {
             preencherCampo(form, linhaAtual.toString().trim(), nomesDasLinhas[linhaIndex]);
         }
     }
 
     private void preencherCampo(PDAcroForm form, String valor, String... nomesPossiveis) {
-        if (valor == null || valor.trim().isEmpty() || "null".equals(valor)) return;
+        if (valor == null || valor.trim().isEmpty() || valor.equals("null")) return;
         for (String nome : nomesPossiveis) {
             try {
                 PDField field = form.getField(nome);
@@ -227,12 +271,10 @@ public class FicaiPdfService {
                     return;
                 }
             } catch (Exception e) {
-                // CORREÇÃO: Agora loga warning ao invés de engolir silenciosamente
-                log.warn("Erro ao preencher campo '{}' com valor '{}': {}", nome, valor, e.getMessage());
+                log.warn("Erro ao preencher campo '{}': {}", nome, e.getMessage());
             }
         }
-        // Se nenhum campo foi encontrado, loga debug
-        log.debug("Campo PDF não encontrado. Tentados: {}. Valor: {}", String.join(", ", nomesPossiveis), valor);
+        log.debug("Campo PDF não encontrado: {}", String.join(", ", nomesPossiveis));
     }
 
     private void marcarCheckbox(PDAcroForm form, String... nomesPossiveis) {
@@ -259,5 +301,6 @@ public class FicaiPdfService {
                 log.warn("Erro ao marcar checkbox '{}': {}", nome, e.getMessage());
             }
         }
+        log.debug("Campo PDF não encontrado: {}", String.join(", ", nomesPossiveis));
     }
 }

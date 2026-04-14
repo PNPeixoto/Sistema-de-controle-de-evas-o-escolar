@@ -4,53 +4,35 @@ import com.peixoto.usuario.infrastructure.entity.Usuario;
 import com.peixoto.usuario.infrastructure.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
-/**
- * Utilitário de autenticação compartilhado entre controllers.
- * Evita duplicação da lógica isSemed/getUsuarioLogado.
- * Usa comparação EXATA de roles (não contains).
- */
 @Component
 @RequiredArgsConstructor
 public class AuthUtils {
 
     private final UsuarioRepository usuarioRepository;
 
-    public Authentication getAuth() {
-        return SecurityContextHolder.getContext().getAuthentication();
-    }
-
-    /**
-     * Verifica se o usuário logado tem cargo SEMED ou ADMIN.
-     * Usa igualdade exata para evitar bypass com cargos customizados.
-     */
     public boolean isSemed() {
-        Authentication auth = getAuth();
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || auth.getAuthorities() == null) return false;
-
-        return auth.getAuthorities().stream().anyMatch(role -> {
-            String authority = role.getAuthority();
-            return "ROLE_SEMED".equals(authority) || "ROLE_ADMIN".equals(authority);
-        });
+        for (GrantedAuthority a : auth.getAuthorities()) {
+            String role = a.getAuthority();
+            if ("ROLE_SEMED".equals(role) || "ROLE_ADMIN".equals(role)) return true;
+        }
+        return false;
     }
 
-    /**
-     * Retorna a entidade Usuario do usuário logado.
-     */
     public Usuario getUsuarioLogado() {
-        Authentication auth = getAuth();
-        return usuarioRepository.findByEmail(auth.getName())
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return usuarioRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado no sistema"));
     }
 
-    /**
-     * Verifica se o aluno pertence à escola do usuário logado.
-     */
     public boolean pertenceAMinhaEscola(String escolaDoAluno) {
-        if (isSemed()) return true; // SEMED vê tudo
-        Usuario usuario = getUsuarioLogado();
-        return usuario.getEscolaNome().equalsIgnoreCase(escolaDoAluno);
+        if (isSemed()) return true;
+        Usuario logado = getUsuarioLogado();
+        return logado.getEscolaNome() != null && logado.getEscolaNome().equalsIgnoreCase(escolaDoAluno);
     }
 }

@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { api } from '../../services/api';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+
+const CORES = ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#F97316', '#EC4899'];
 
 export default function PainelSemed() {
     const [alunosBrutos, setAlunosBrutos] = useState<any[]>([]);
@@ -43,6 +46,9 @@ export default function PainelSemed() {
         rankingEscolas,
         rankingBairros,
         rankingCor,
+        chartEscolas,
+        chartBairros,
+        chartCor,
         bairrosDisponiveis,
         escolaridadesDisponiveis
     } = useMemo(() => {
@@ -69,6 +75,15 @@ export default function PainelSemed() {
             return Object.entries(contagem).sort((a, b) => b[1] - a[1]).slice(0, 6); // Top 6
         };
 
+        const gerarRankingCompleto = (extrator: (aluno: any) => string) => {
+            const contagem: Record<string, number> = {};
+            filtrados.forEach(a => {
+                const chave = extrator(a);
+                contagem[chave] = (contagem[chave] || 0) + 1;
+            });
+            return Object.entries(contagem).sort((a, b) => b[1] - a[1]);
+        };
+
         // 3. Listas para os Selects (Filtros)
         const todosEvasivos = alunosBrutos.filter(a => a.historicoEvasao && a.historicoEvasao.length > 0);
         const bairros = Array.from(new Set(todosEvasivos.map(a => a.enderecos?.[0]?.bairro || 'Sem Bairro'))).sort();
@@ -80,6 +95,9 @@ export default function PainelSemed() {
             rankingEscolas: gerarRanking(a => a.escola),
             rankingBairros: gerarRanking(a => a.enderecos?.[0]?.bairro || 'Não Informado'),
             rankingCor: gerarRanking(a => a.cor || 'Não Declarada'),
+            chartEscolas: gerarRankingCompleto(a => a.escola).slice(0, 10).map(([nome, qtd]) => ({ nome: nome.length > 25 ? nome.substring(0, 25) + '…' : nome, qtd })),
+            chartBairros: gerarRankingCompleto(a => a.enderecos?.[0]?.bairro || 'Não Informado').slice(0, 10).map(([nome, qtd]) => ({ nome, qtd })),
+            chartCor: gerarRankingCompleto(a => a.cor || 'Não Declarada').map(([name, value]) => ({ name, value })),
             bairrosDisponiveis: bairros as string[],
             escolaridadesDisponiveis: escolaridades as string[]
         };
@@ -87,7 +105,7 @@ export default function PainelSemed() {
 
 
     // COMPONENTE: Gráfico de Barras Horizontal (Feito com Tailwind)
-    const BarChart = ({ titulo, dados, totalMax, icone, corBg, corBarra }: any) => (
+    const BarChartSimples = ({ titulo, dados, totalMax, icone, corBg, corBarra }: any) => (
         <div className={`bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full`}>
             <div className="flex items-center gap-2 mb-6">
                 <span className={`p-2 rounded-lg ${corBg}`}>{icone}</span>
@@ -166,26 +184,82 @@ export default function PainelSemed() {
 
             {/* DASHBOARD GRID (GRÁFICOS) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <BarChart
+                <BarChartSimples
                     titulo="Top 6 - Escolas Críticas"
                     dados={rankingEscolas}
                     totalMax={rankingEscolas[0]?.[1] || 0} // Usa o maior valor como 100% da barra
                     icone="🏫" corBg="bg-blue-100" corBarra="bg-blue-500"
                 />
 
-                <BarChart
+                <BarChartSimples
                     titulo="Top 6 - Bairros Críticos"
                     dados={rankingBairros}
                     totalMax={rankingBairros[0]?.[1] || 0}
                     icone="🗺️" corBg="bg-red-100" corBarra="bg-red-500"
                 />
 
-                <BarChart
+                <BarChartSimples
                     titulo="Perfil por Cor/Raça"
                     dados={rankingCor}
                     totalMax={totalEvasoes} // Aqui usa o total de evasões como 100%
                     icone="👤" corBg="bg-amber-100" corBarra="bg-amber-500"
                 />
+            </div>
+
+            {/* GRÁFICOS DETALHADOS (RECHARTS) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h3 className="text-lg font-bold text-slate-800 mb-4">Top 10 Escolas — Evasões Registradas</h3>
+                    <div style={{ width: '100%', height: 350 }}>
+                        <ResponsiveContainer>
+                            <BarChart data={chartEscolas} layout="vertical" margin={{ left: 20, right: 20 }}>
+                                <XAxis type="number" allowDecimals={false} />
+                                <YAxis type="category" dataKey="nome" width={160} tick={{ fontSize: 11 }} />
+                                <Tooltip />
+                                <Bar dataKey="qtd" fill="#2563EB" radius={[0, 4, 4, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h3 className="text-lg font-bold text-slate-800 mb-4">Distribuição por Cor/Raça</h3>
+                    <div style={{ width: '100%', height: 350 }}>
+                        <ResponsiveContainer>
+                            <PieChart>
+                                <Pie
+                                    data={chartCor}
+                                    dataKey="value"
+                                    nameKey="name"
+                                    cx="50%"
+                                    cy="50%"
+                                    outerRadius={110}
+                                    label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                >
+                                    {chartCor.map((_: any, idx: number) => (
+                                        <Cell key={idx} fill={CORES[idx % CORES.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                                <Legend />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 lg:col-span-2">
+                    <h3 className="text-lg font-bold text-slate-800 mb-4">Top 10 Bairros — Concentração de Evasões</h3>
+                    <div style={{ width: '100%', height: 350 }}>
+                        <ResponsiveContainer>
+                            <BarChart data={chartBairros} margin={{ bottom: 60 }}>
+                                <XAxis dataKey="nome" angle={-30} textAnchor="end" interval={0} tick={{ fontSize: 11 }} height={80} />
+                                <YAxis allowDecimals={false} />
+                                <Tooltip />
+                                <Bar dataKey="qtd" fill="#10B981" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
             </div>
         </div>
     );

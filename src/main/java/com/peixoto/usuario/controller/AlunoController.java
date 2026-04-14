@@ -25,10 +25,14 @@ public class AlunoController {
 
     @PostMapping
     public ResponseEntity<Aluno> salvaAluno(@Valid @RequestBody AlunoDTO alunoDTO) {
-        if (authUtils.isSemed()) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (authUtils.isSemed()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
 
         Usuario usuarioLogado = authUtils.getUsuarioLogado();
-        alunoDTO.setEscola(usuarioLogado.getEscolaNome()); // Anti-IDOR
+
+        // Anti-IDOR: Força a escola do usuário logado
+        alunoDTO.setEscola(usuarioLogado.getEscolaNome());
 
         return ResponseEntity.ok(alunoService.salvaAluno(alunoDTO));
     }
@@ -38,13 +42,15 @@ public class AlunoController {
         if (!authUtils.pertenceAMinhaEscola(nomeEscola)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
+
         return ResponseEntity.ok(alunoService.buscarTodosPorEscola(nomeEscola));
     }
 
-    // NOVO: Endpoint PUT para editar aluno
     @PutMapping("/{id}")
     public ResponseEntity<Aluno> atualizarAluno(@PathVariable Long id, @Valid @RequestBody AlunoDTO alunoDTO) {
-        if (authUtils.isSemed()) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (authUtils.isSemed()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
 
         Aluno alunoBanco = alunoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Aluno não encontrado"));
@@ -62,7 +68,9 @@ public class AlunoController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletarAluno(@PathVariable Long id) {
-        if (authUtils.isSemed()) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (authUtils.isSemed()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
 
         Aluno alunoBanco = alunoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Aluno não encontrado"));
