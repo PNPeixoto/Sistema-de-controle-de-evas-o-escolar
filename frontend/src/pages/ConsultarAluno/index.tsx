@@ -4,7 +4,7 @@ import { api } from '../../services/api';
 
 // (MANTENHA SUAS INTERFACES AQUI)
 interface AcaoTomada { id: number; dataAcao: string; descricao: string; }
-interface OcorrenciaEvasao { id: number; mesFaltas: string; quantidadeFaltas: number; motivoAfastamento: string; encaminhamentosLaudos: string; conclusao: string; acoes: AcaoTomada[]; }
+interface OcorrenciaEvasao { id: number; mesFaltas: string; quantidadeFaltas: number; motivoAfastamento: string; encaminhamentosLaudos: string; conclusao: string; acoes: AcaoTomada[]; status?: string; criadoEm?: string; }
 interface Aluno { id: number; nomeCompleto: string; escolaridade: string; turno: string; aee: boolean; dataNascimento: string; cor: string; beneficios: string; enderecos: { rua: string; numero: number; bairro: string; cidade: string }[]; filiacao: { mae: string; pai: string; responsavel: string; telefoneResponsável: string }[]; telefones: { ddd: string; numero: string }[]; historicoEvasao: OcorrenciaEvasao[]; }
 
 export default function ConsultarAluno() {
@@ -201,6 +201,9 @@ export default function ConsultarAluno() {
                                                         <div className="flex items-center gap-4 md:gap-8 text-sm md:text-base text-left">
                                                             <span className="font-bold text-slate-800 min-w-[120px]">Faltas em {evasao.mesFaltas}</span>
                                                             <span className="font-bold text-red-600 px-3 py-1 bg-red-100 rounded-md">{evasao.quantidadeFaltas} dias</span>
+                                                            <span className={`text-xs font-bold px-2 py-1 rounded ${evasao.status === 'RESOLVIDA' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                                                {evasao.status === 'RESOLVIDA' ? 'RESOLVIDA' : 'ABERTA'}
+                                                            </span>
                                                             <span className="text-slate-500 hidden md:block truncate max-w-[250px]">{evasao.motivoAfastamento}</span>
                                                         </div>
                                                         <div className="text-slate-400 font-bold text-2xl leading-none">
@@ -249,6 +252,26 @@ export default function ConsultarAluno() {
                                                                     {evasao.conclusao}
                                                                 </p>
                                                             </div>
+
+                                                            {evasao.status !== 'RESOLVIDA' && (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (window.confirm('Confirma normalização da frequência?')) {
+                                                                            try {
+                                                                                await api.put(`/evasao/${evasao.id}/resolver`);
+                                                                                buscarAlunos();
+                                                                                setAlunoSelecionado(null);
+                                                                                alert('Frequência normalizada!');
+                                                                            } catch (err) {
+                                                                                alert('Erro ao normalizar.');
+                                                                            }
+                                                                        }
+                                                                    }}
+                                                                    className="mt-4 px-4 py-2 bg-emerald-500 text-white font-bold rounded-lg hover:bg-emerald-600 transition text-sm"
+                                                                >
+                                                                    ✓ Normalizar Frequência
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>

@@ -51,10 +51,7 @@ export default function DashboardHome() {
         }
     };
 
-    // Usa sessionStorage para dados temporários de resolução (não sensíveis)
     const processarEstatisticas = (alunos: any[]) => {
-        const ficiaisResolvidas = JSON.parse(sessionStorage.getItem('ficiaisResolvidas') || '[]');
-
         const infrequentes: any[] = [];
         const visitas: any[] = [];
         let countResolvidas = 0;
@@ -63,7 +60,7 @@ export default function DashboardHome() {
             if (aluno.historicoEvasao && aluno.historicoEvasao.length > 0) {
                 const evasaoAtiva = aluno.historicoEvasao[0];
 
-                if (ficiaisResolvidas.includes(evasaoAtiva.id)) {
+                if (evasaoAtiva.status === 'RESOLVIDA') {
                     countResolvidas++;
                 } else {
                     infrequentes.push(aluno);
@@ -92,18 +89,32 @@ export default function DashboardHome() {
         });
     };
 
-    const marcarComoResolvido = (evasaoId: number) => {
-        if(window.confirm('Tem certeza que a frequência deste aluno foi normalizada?')) {
-            const resolvidas = JSON.parse(sessionStorage.getItem('ficiaisResolvidas') || '[]');
-            resolvidas.push(evasaoId);
-            sessionStorage.setItem('ficiaisResolvidas', JSON.stringify(resolvidas));
-
-            processarEstatisticas(alunosBrutos);
-
-            if (alunosInfracoes.length <= 1) setMostrarModalFicais(false);
-            if (alunosVisitas.length <= 1) setMostrarModalVisitas(false);
+    const marcarComoResolvido = async (evasaoId: number) => {
+        if (window.confirm('Tem certeza que a frequência deste aluno foi normalizada?')) {
+            try {
+                await api.put(`/evasao/${evasaoId}/resolver`);
+                await carregarDadosDaApi();
+                if (alunosInfracoes.length <= 1) setMostrarModalFicais(false);
+                if (alunosVisitas.length <= 1) setMostrarModalVisitas(false);
+            } catch (error) {
+                console.error('Erro ao resolver evasão:', error);
+                alert('Erro ao marcar como resolvido. Tente novamente.');
+            }
         }
     };
+
+    const formatarData = (iso?: string) => {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return iso;
+        return d.toLocaleDateString('pt-BR');
+    };
+
+    const ultimasAtividades = alunosBrutos
+        .filter(a => a.historicoEvasao?.length > 0)
+        .flatMap(a => a.historicoEvasao.map((e: any) => ({ ...e, alunoNome: a.nomeCompleto })))
+        .sort((a: any, b: any) => (b.criadoEm || '').localeCompare(a.criadoEm || ''))
+        .slice(0, 5);
 
     const calcularIdade = (data: string) => {
         if (!data) return 'N/I';
@@ -179,9 +190,31 @@ export default function DashboardHome() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
                     <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                         <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">Últimas Atividades Registradas</h2>
-                        <div className="flex flex-col items-center justify-center p-10 text-slate-500 bg-slate-50 rounded-lg border-2 border-dashed border-slate-300">
-                            <p className="font-medium">Lista de atividades em desenvolvimento...</p>
-                        </div>
+                        {ultimasAtividades.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center p-10 text-slate-500 bg-slate-50 rounded-lg border-2 border-dashed border-slate-300">
+                                <p className="font-medium">Nenhuma evasão registrada ainda.</p>
+                            </div>
+                        ) : (
+                            <ul className="divide-y divide-slate-100">
+                                {ultimasAtividades.map((atv: any) => {
+                                    const status = atv.status || 'ABERTA';
+                                    const resolvida = status === 'RESOLVIDA';
+                                    return (
+                                        <li key={atv.id} className="py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                                            <div className="min-w-0">
+                                                <p className="font-semibold text-slate-800 truncate">{atv.alunoNome}</p>
+                                                <p className="text-xs text-slate-500">
+                                                    Faltas em <span className="font-medium">{atv.mesFaltas}</span> • {atv.quantidadeFaltas} dias • {formatarData(atv.criadoEm)}
+                                                </p>
+                                            </div>
+                                            <span className={`text-xs font-bold px-2 py-1 rounded self-start md:self-auto ${resolvida ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                                {resolvida ? 'RESOLVIDA' : 'ABERTA'}
+                                            </span>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
                     </div>
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col gap-4">
                         <h2 className="text-lg font-bold text-slate-800 mb-2">Ações Rápidas</h2>

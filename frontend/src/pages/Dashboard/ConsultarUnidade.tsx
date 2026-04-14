@@ -23,9 +23,7 @@ export default function ConsultarUnidade() {
     const [carregandoAlunos, setCarregandoAlunos] = useState(false);
     const [alunoSelecionado, setAlunoSelecionado] = useState<Aluno | null>(null);
 
-    // CARREGA OS STATUS DO CACHE (LOCALSTORAGE)
-    const [ficiaisBaixadas, setFiciaisBaixadas] = useState<number[]>(JSON.parse(sessionStorage.getItem('ficiaisBaixadas') || '[]'));
-    const [ficiaisResolvidas, setFiciaisResolvidas] = useState<number[]>(JSON.parse(sessionStorage.getItem('ficiaisResolvidas') || '[]'));
+    const [ficiaisBaixadas, setFiciaisBaixadas] = useState<number[]>([]);
 
     useEffect(() => {
         carregarTodasAsEscolas();
@@ -82,11 +80,8 @@ export default function ConsultarUnidade() {
             link.click();
             link.remove();
 
-            // Salva no Cache que essa FICAI já foi baixada
             if (!ficiaisBaixadas.includes(evasaoId)) {
-                const atualizadas = [...ficiaisBaixadas, evasaoId];
-                setFiciaisBaixadas(atualizadas);
-                sessionStorage.setItem('ficiaisBaixadas', JSON.stringify(atualizadas));
+                setFiciaisBaixadas([...ficiaisBaixadas, evasaoId]);
             }
 
         } catch (error) {
@@ -94,12 +89,20 @@ export default function ConsultarUnidade() {
         }
     };
 
-    // Função manual de resolver por dentro do Modal também
-    const resolverFicaiPeloModal = (evasaoId: number) => {
-        if(window.confirm('Tem certeza que a frequência foi normalizada?')) {
-            const atualizadas = [...ficiaisResolvidas, evasaoId];
-            setFiciaisResolvidas(atualizadas);
-            sessionStorage.setItem('ficiaisResolvidas', JSON.stringify(atualizadas));
+    const resolverFicaiPeloModal = async (evasaoId: number) => {
+        if (window.confirm('Tem certeza que a frequência foi normalizada?')) {
+            try {
+                await api.put(`/evasao/${evasaoId}/resolver`);
+                if (escolaAtiva) {
+                    const resposta = await api.get(`/aluno/escola/${encodeURIComponent(escolaAtiva)}`);
+                    const lista = Array.isArray(resposta.data) ? resposta.data : [];
+                    setAlunosSemed(lista);
+                    const atual = lista.find((a: Aluno) => a.id === alunoSelecionado?.id);
+                    setAlunoSelecionado(atual || null);
+                }
+            } catch (err) {
+                alert('Erro ao normalizar.');
+            }
         }
     };
 
@@ -157,7 +160,7 @@ export default function ConsultarUnidade() {
                             <tbody>
                             {alunosSemed.map(aluno => {
                                 const temEvasao = aluno.historicoEvasao && aluno.historicoEvasao.length > 0;
-                                const isResolvida = temEvasao && ficiaisResolvidas.includes(aluno.historicoEvasao[0].id);
+                                const isResolvida = temEvasao && aluno.historicoEvasao[0].status === 'RESOLVIDA';
 
                                 return (
                                     <tr key={aluno.id} className="hover:bg-slate-50 transition border-b border-slate-100">
@@ -165,9 +168,9 @@ export default function ConsultarUnidade() {
                                         <td className="px-5 py-4 text-sm text-slate-600">{aluno.escolaridade}</td>
                                         <td className="px-5 py-4">
                                             {isResolvida
-                                                ? <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-bold">✅ Frequência Normal</span>
+                                                ? <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold">RESOLVIDA</span>
                                                 : temEvasao
-                                                    ? <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs font-bold">🚨 Infrequente</span>
+                                                    ? <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold">ABERTA</span>
                                                     : <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-bold">Regular (Sem Histórico)</span>
                                             }
                                         </td>
@@ -201,7 +204,7 @@ export default function ConsultarUnidade() {
 
                                 {/* LÓGICA DE EXIBIÇÃO DA FICAI (VERIFICA SE ESTÁ RESOLVIDA OU BAIXADA) */}
                                 {alunoSelecionado.historicoEvasao && alunoSelecionado.historicoEvasao.length > 0 && (
-                                    ficiaisResolvidas.includes(alunoSelecionado.historicoEvasao[0].id) ? (
+                                    alunoSelecionado.historicoEvasao[0].status === 'RESOLVIDA' ? (
                                         <div className="bg-green-50 border border-green-200 rounded-xl p-6 flex flex-col md:flex-row justify-between items-center gap-4">
                                             <div>
                                                 <h3 className="text-green-800 font-bold text-lg flex items-center gap-2">✅ FICAI Resolvida</h3>
