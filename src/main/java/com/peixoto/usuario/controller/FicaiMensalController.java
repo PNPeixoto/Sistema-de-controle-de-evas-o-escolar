@@ -4,13 +4,11 @@ import com.peixoto.usuario.business.FicaiMensalService;
 import com.peixoto.usuario.business.dto.FicaiMensalDTO;
 import com.peixoto.usuario.infrastructure.entity.FicaiMensal;
 import com.peixoto.usuario.infrastructure.entity.Usuario;
-import com.peixoto.usuario.infrastructure.repository.UsuarioRepository;
+import com.peixoto.usuario.infrastructure.security.AuthUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -21,24 +19,15 @@ import java.util.Map;
 public class FicaiMensalController {
 
     private final FicaiMensalService ficaiMensalService;
-    private final UsuarioRepository usuarioRepository;
+    private final AuthUtils authUtils;
 
-    /**
-     * POST /ficai-mensal
-     * Botão "Não possui FICAI este mês"
-     * Cria a declaração com termo de consentimento
-     */
     @PostMapping
     public ResponseEntity<FicaiMensal> registrarSemFicai(@Valid @RequestBody FicaiMensalDTO dto) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-
-        // SEMED não pode declarar por uma escola
-        if (isSemed(auth)) {
+        if (authUtils.isSemed()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
-        Usuario usuario = usuarioRepository.findByEmail(auth.getName())
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        Usuario usuario = authUtils.getUsuarioLogado();
 
         FicaiMensal registro = ficaiMensalService.registrarSemFicai(
                 usuario.getEscolaNome(), usuario.getNome(), dto);
@@ -46,15 +35,9 @@ public class FicaiMensalController {
         return ResponseEntity.ok(registro);
     }
 
-    /**
-     * GET /ficai-mensal?mes=2026-04
-     * Consulta se a escola já tem registro naquele mês
-     */
     @GetMapping
     public ResponseEntity<Map<String, Object>> consultarMes(@RequestParam("mes") String mesReferencia) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        Usuario usuario = usuarioRepository.findByEmail(auth.getName())
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        Usuario usuario = authUtils.getUsuarioLogado();
 
         FicaiMensal registro = ficaiMensalService.consultarMes(usuario.getEscolaNome(), mesReferencia);
 
@@ -72,11 +55,5 @@ public class FicaiMensalController {
                 "assinadoPor", registro.getAssinadoPor(),
                 "mesReferencia", mesReferencia
         ));
-    }
-
-    private boolean isSemed(Authentication auth) {
-        return auth.getAuthorities().stream()
-                .anyMatch(role -> role.getAuthority().toUpperCase().contains("SEMED") ||
-                        role.getAuthority().toUpperCase().contains("ADMIN"));
     }
 }

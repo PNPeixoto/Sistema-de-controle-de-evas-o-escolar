@@ -8,6 +8,8 @@ import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm;
 import org.apache.pdfbox.pdmodel.interactive.form.PDField;
 import org.apache.pdfbox.pdmodel.interactive.form.PDCheckBox;
 import org.apache.pdfbox.pdmodel.interactive.form.PDButton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +20,8 @@ import java.util.Set;
 
 @Service
 public class FicaiPdfService {
+
+    private static final Logger log = LoggerFactory.getLogger(FicaiPdfService.class);
 
     public byte[] gerarFicaiPdf(Aluno aluno, OcorrenciaEvasao evasao) {
         try (InputStream templateStream = new ClassPathResource("ficai_template.pdf").getInputStream();
@@ -266,8 +270,11 @@ public class FicaiPdfService {
                     field.setValue(valor);
                     return;
                 }
-            } catch (Exception e) {}
+            } catch (Exception e) {
+                log.warn("Erro ao preencher campo '{}': {}", nome, e.getMessage());
+            }
         }
+        log.debug("Campo PDF não encontrado: {}", String.join(", ", nomesPossiveis));
     }
 
     private void marcarCheckbox(PDAcroForm form, String... nomesPossiveis) {
@@ -290,7 +297,10 @@ public class FicaiPdfService {
                     }
                     return;
                 }
-            } catch (Exception e) {}
+            } catch (Exception e) {
+                log.warn("Erro ao marcar checkbox '{}': {}", nome, e.getMessage());
+            }
         }
+        log.debug("Campo PDF não encontrado: {}", String.join(", ", nomesPossiveis));
     }
 }

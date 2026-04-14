@@ -10,6 +10,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -37,6 +38,8 @@ public class EvasaoService {
         ocorrencia.setReincidente(dto.getReincidente());
         ocorrencia.setProvidenciasAdotadas(dto.getProvidenciasAdotadas());
         ocorrencia.setOutrasProvidencias(dto.getOutrasProvidencias());
+        ocorrencia.setStatus("ABERTA");
+        ocorrencia.setCriadoEm(LocalDateTime.now());
 
         ocorrencia.setAluno(aluno);
 
@@ -57,5 +60,36 @@ public class EvasaoService {
         alunoRepository.save(aluno);
 
         return ocorrencia;
+    }
+
+    public OcorrenciaEvasao buscarEvasao(Long evasaoId) {
+        return alunoRepository.findAll().stream()
+                .flatMap(a -> a.getHistoricoEvasao().stream())
+                .filter(e -> evasaoId.equals(e.getId()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    @CacheEvict(value = "alunos_escola", allEntries = true)
+    @Transactional
+    public void resolverEvasao(Long evasaoId) {
+        Aluno alunoDono = null;
+        OcorrenciaEvasao alvo = null;
+        for (Aluno a : alunoRepository.findAll()) {
+            for (OcorrenciaEvasao e : a.getHistoricoEvasao()) {
+                if (evasaoId.equals(e.getId())) {
+                    alunoDono = a;
+                    alvo = e;
+                    break;
+                }
+            }
+            if (alvo != null) break;
+        }
+        if (alvo == null) {
+            throw new RuntimeException("Evasão não encontrada: " + evasaoId);
+        }
+        alvo.setStatus("RESOLVIDA");
+        alvo.setDataResolucao(LocalDateTime.now());
+        alunoRepository.save(alunoDono);
     }
 }

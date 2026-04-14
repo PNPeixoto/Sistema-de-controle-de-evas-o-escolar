@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -50,6 +51,17 @@ public class OcorrenciaEvasao {
     private LocalDate dataAssinaturaDiretor;
 
     private String assinaturaDiretor;
+
+    @Column(name = "status", nullable = false)
+    @Builder.Default
+    private String status = "ABERTA";
+
+    @Column(name = "data_resolucao")
+    private LocalDateTime dataResolucao;
+
+    @Column(name = "criado_em", updatable = false)
+    @Builder.Default
+    private LocalDateTime criadoEm = LocalDateTime.now();
 
     // ------------------------------------
 

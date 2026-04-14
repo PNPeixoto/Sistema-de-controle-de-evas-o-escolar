@@ -17,6 +17,11 @@ import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -46,17 +51,24 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // Público: somente login
                         .requestMatchers("/usuario/login/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/auth").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/usuario").permitAll()
                         .requestMatchers("/error").permitAll()
 
+                        // CORREÇÃO: POST /usuario agora exige autenticação (só ADMIN/SEMED cria usuários)
+                        // Removido: .requestMatchers(HttpMethod.POST, "/usuario").permitAll()
+
+                        // Autenticado
                         .requestMatchers(HttpMethod.GET, "/usuario/me").authenticated()
                         .requestMatchers(HttpMethod.POST, "/usuario/logout").authenticated()
                         .requestMatchers("/ficai-mensal/**").authenticated()
-
                         .requestMatchers("/evasao/**").authenticated()
                         .requestMatchers("/aluno/**").authenticated()
+                        .requestMatchers("/semed/**").authenticated()
+                        .requestMatchers("/relatorios/**").authenticated()
+                        .requestMatchers("/bairros/**").authenticated()
+                        .requestMatchers("/escolas/**").authenticated()
                         .requestMatchers("/usuario/**").authenticated()
                         .anyRequest().authenticated()
                 )
@@ -69,34 +81,34 @@ public class SecurityConfig {
     }
 
     @Bean
-    public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
-        org.springframework.web.cors.CorsConfiguration configuration = new org.springframework.web.cors.CorsConfiguration();
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(java.util.List.of(
+        config.setAllowedOrigins(List.of(
                 "http://localhost:5173",
-                "https://sistema-de-controle-de-evas-o-escol-gamma.vercel.app"
+                "https://sistema-de-controle-de-evas-o-escol-gamma.vercel.app",
+                "https://sistema-de-controle-de-evas-o-escol.vercel.app"
         ));
 
-        configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(java.util.List.of("*"));
-        configuration.setAllowCredentials(true); // ESSENCIAL para cookies cross-origin
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+        config.setExposedHeaders(List.of("Set-Cookie"));
+        config.setMaxAge(3600L);
 
-        org.springframework.web.cors.UrlBasedCorsConfigurationSource source =
-                new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
         return source;
     }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
         Argon2PasswordEncoder argon2 = new Argon2PasswordEncoder(16, 32, 1, 65536, 3);
-
         return new PasswordEncoder() {
             @Override
             public String encode(CharSequence rawPassword) {
                 return argon2.encode(rawPassword.toString() + pepper);
             }
-
             @Override
             public boolean matches(CharSequence rawPassword, String encodedPassword) {
                 return argon2.matches(rawPassword.toString() + pepper, encodedPassword);

@@ -2,13 +2,12 @@ package com.peixoto.usuario.controller;
 
 import com.peixoto.usuario.infrastructure.entity.Aluno;
 import com.peixoto.usuario.infrastructure.repository.AlunoRepository;
+import com.peixoto.usuario.infrastructure.security.AuthUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,14 +26,7 @@ import java.util.stream.Collectors;
 public class SemedController {
 
     private final AlunoRepository alunoRepository;
-
-    private boolean temPermissaoSemed() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getAuthorities() == null) return false;
-        return auth.getAuthorities().stream()
-                .anyMatch(role -> role.getAuthority().toUpperCase().contains("SEMED") ||
-                        role.getAuthority().toUpperCase().contains("ADMIN"));
-    }
+    private final AuthUtils authUtils;
 
     // Função interna para converter a Data de Nascimento em Idade
     private int calcularIdade(Aluno aluno) {
@@ -47,7 +39,7 @@ public class SemedController {
     // ==========================================
     @GetMapping("/alunos/todos")
     public ResponseEntity<List<Aluno>> buscarTodosAlunosSemed() {
-        if (!temPermissaoSemed()) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!authUtils.isSemed()) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         return ResponseEntity.ok(alunoRepository.findAll());
     }
 
@@ -56,7 +48,7 @@ public class SemedController {
     // ==========================================
     @GetMapping("/estatisticas")
     public ResponseEntity<Map<String, Object>> getEstatisticasSemed() {
-        if (!temPermissaoSemed()) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!authUtils.isSemed()) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         List<Aluno> todosAlunos = alunoRepository.findAll();
         // Filtramos apenas os alunos que têm FICAI (Evasão) para as estatísticas
@@ -96,7 +88,7 @@ public class SemedController {
     // ==========================================
     @GetMapping("/exportar")
     public ResponseEntity<byte[]> exportarPlanilha() {
-        if (!temPermissaoSemed()) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!authUtils.isSemed()) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
 
         List<Aluno> todosAlunos = alunoRepository.findAll();
 

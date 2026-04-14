@@ -47,6 +47,26 @@ public class AlunoService {
         alunoRepository.deleteById(id);
     }
 
+    @CacheEvict(value = "alunos_escola", allEntries = true)
+    @Transactional
+    public Aluno atualizarAluno(Long id, AlunoDTO dto) {
+        Aluno existente = alunoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Aluno não encontrado: " + id));
+
+        existente.setNomeCompleto(dto.getNomeCompleto());
+        existente.setEscola(dto.getEscola());
+        existente.setDataNascimento(dto.getDataNascimento());
+        existente.setSexo(dto.getSexo());
+        existente.setCor(dto.getCor());
+        existente.setEscolaridade(dto.getEscolaridade());
+        existente.setAee(dto.getAee());
+        existente.setTurno(dto.getTurno());
+        existente.setDefasagem(dto.getDefasagem());
+        existente.setBeneficios(dto.getBeneficios());
+
+        return alunoRepository.save(existente);
+    }
+
     // A MÁGICA ACONTECE AQUI: Guarda o retorno na memória RAM do servidor
     @Cacheable(value = "alunos_escola", key = "#escola")
     public List<Aluno> buscarTodosPorEscola(String escola) {
