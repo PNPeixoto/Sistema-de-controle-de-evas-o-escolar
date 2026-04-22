@@ -5,6 +5,7 @@ import com.peixoto.usuario.business.dto.LoginEtapa1DTO;
 import com.peixoto.usuario.business.dto.LoginEtapa2DTO;
 import com.peixoto.usuario.business.dto.UsuarioDTO;
 import com.peixoto.usuario.infrastructure.exceptions.UnauthorizedException;
+import com.peixoto.usuario.infrastructure.security.LoginStepChallengeService;
 import com.peixoto.usuario.infrastructure.security.RateLimitService;
 import com.peixoto.usuario.infrastructure.security.TokenBlacklistService;
 import jakarta.servlet.http.Cookie;
@@ -31,6 +32,7 @@ public class UsuarioController {
     private final UsuarioService usuarioService;
     private final RateLimitService rateLimitService;
     private final TokenBlacklistService tokenBlacklistService;
+    private final LoginStepChallengeService loginStepChallengeService;
 
     @Value("${app.security.cookie-secure:true}")
     private boolean cookieSecure;
@@ -56,7 +58,8 @@ public class UsuarioController {
     // ==========================================
     @PostMapping("/login/etapa1")
     public ResponseEntity<Map<String, String>> loginEtapa1(@Valid @RequestBody LoginEtapa1DTO dto,
-                                                            HttpServletRequest request) {
+                                                            HttpServletRequest request,
+                                                            HttpServletResponse response) {
         String ip = getClientIp(request);
         String key = "etapa1:" + ip;
 
@@ -66,7 +69,18 @@ public class UsuarioController {
 
         try {
             String nomeEscola = usuarioService.validarEscola(dto);
+            String challengeToken = loginStepChallengeService.issueChallenge(dto.email(), ip);
+
+            ResponseCookie stageOneCookie = ResponseCookie.from("pnp_login_stage1", challengeToken)
+                    .httpOnly(true)
+                    .secure(cookieSecure)
+                    .path("/")
+                    .maxAge(5 * 60)
+                    .sameSite(cookieSecure ? "None" : "Lax")
+                    .build();
+
             rateLimitService.resetAttempts(key);
+            response.addHeader(HttpHeaders.SET_COOKIE, stageOneCookie.toString());
             return ResponseEntity.ok(Map.of("escolaNome", nomeEscola));
         } catch (Exception e) {
             rateLimitService.recordAttempt(key);
@@ -80,9 +94,15 @@ public class UsuarioController {
                                                             HttpServletResponse response) {
         String ip = getClientIp(request);
         String key = "etapa2:" + ip + ":" + dto.email();
+        String stageOneToken = getCookieValue(request, "pnp_login_stage1");
 
         if (rateLimitService.isBlocked(key)) {
             throw new UnauthorizedException("Muitas tentativas. Aguarde 15 minutos.");
+        }
+
+        if (!loginStepChallengeService.isValid(stageOneToken, dto.email(), ip)) {
+            rateLimitService.recordAttempt(key);
+            throw new UnauthorizedException("Etapa 1 do login expirou ou não foi concluída. Reinicie o acesso.");
         }
 
         try {
@@ -96,10 +116,12 @@ public class UsuarioController {
                     .maxAge(2 * 60 * 60)
                     .sameSite(cookieSecure ? "None" : "Lax")
                     .build();
+            loginStepChallengeService.consume(stageOneToken);
             response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+            response.addHeader(HttpHeaders.SET_COOKIE, expireCookie("pnp_login_stage1"));
 
             rateLimitService.resetAttempts(key);
-            return ResponseEntity.ok(Map.of("status", "authenticated", "token", tokenComBearer));
+            return ResponseEntity.ok(Map.of("status", "authenticated"));
         } catch (Exception e) {
             rateLimitService.recordAttempt(key);
             throw e;
@@ -131,6 +153,7 @@ public class UsuarioController {
                 .httpOnly(true).secure(cookieSecure).path("/").maxAge(0)
                 .sameSite(cookieSecure ? "None" : "Lax").build();
         response.addHeader(HttpHeaders.SET_COOKIE, deleteCookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, expireCookie("pnp_login_stage1"));
         return ResponseEntity.ok().build();
     }
 
@@ -147,12 +170,38 @@ public class UsuarioController {
 
     @PutMapping
     public ResponseEntity<UsuarioDTO> atualizDadoUsuario(@Valid @RequestBody UsuarioDTO dto,
-                                                         @RequestHeader("Authorization") String token) {
-        return ResponseEntity.ok(usuarioService.atualizaDadosUsuario(token, dto));
+                                                         @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
+        // Mantido por compatibilidade com clientes antigos; a identidade vem do contexto autenticado.
+        return ResponseEntity.ok(usuarioService.atualizaDadosUsuario(dto));
     }
 
     private String getClientIp(HttpServletRequest request) {
         String xff = request.getHeader("X-Forwarded-For");
         return (xff != null && !xff.isEmpty()) ? xff.split(",")[0].trim() : request.getRemoteAddr();
+    }
+
+    private String getCookieValue(HttpServletRequest request, String cookieName) {
+        if (request.getCookies() == null) {
+            return null;
+        }
+
+        for (Cookie cookie : request.getCookies()) {
+            if (cookieName.equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+
+        return null;
+    }
+
+    private String expireCookie(String cookieName) {
+        return ResponseCookie.from(cookieName, "")
+                .httpOnly(true)
+                .secure(cookieSecure)
+                .path("/")
+                .maxAge(0)
+                .sameSite(cookieSecure ? "None" : "Lax")
+                .build()
+                .toString();
     }
 }

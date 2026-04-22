@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.cache.annotation.CacheEvict;
@@ -94,21 +95,27 @@ public class UsuarioService {
     }
 
     @CacheEvict(value = "usuario_email", key = "#result.email")
-    public UsuarioDTO atualizaDadosUsuario(String token, UsuarioDTO dto) {
-        String emailToken = jwtUtil.extractEmailToken(token.substring(7));
+    public UsuarioDTO atualizaDadosUsuario(UsuarioDTO dto) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null) {
+            throw new UnauthorizedException("Usuário não autenticado.");
+        }
 
-        Usuario usuarioEntity = usuarioRepository.findByEmail(emailToken)
+        Usuario usuarioEntity = usuarioRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não localizado"));
 
+        if (dto.getNome() != null && !dto.getNome().isBlank()) {
+            usuarioEntity.setNome(dto.getNome());
+        }
+
         if (dto.getSenhaEscola() != null) {
-            dto.setSenhaEscola(passwordEncoder.encode(dto.getSenhaEscola()));
+            usuarioEntity.setSenhaEscola(passwordEncoder.encode(dto.getSenhaEscola()));
         }
 
         if (dto.getSenhaIndividual() != null) {
-            dto.setSenhaIndividual(passwordEncoder.encode(dto.getSenhaIndividual()));
+            usuarioEntity.setSenhaIndividual(passwordEncoder.encode(dto.getSenhaIndividual()));
         }
 
-        Usuario usuario = usuarioConverter.updateUsuario(dto, usuarioEntity);
-        return usuarioConverter.paraUsuarioDTO(usuarioRepository.save(usuario));
+        return usuarioConverter.paraUsuarioDTO(usuarioRepository.save(usuarioEntity));
     }
 }

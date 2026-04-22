@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext } from 'react';
-import { api, clearToken, getToken, setToken } from '../services/api';
+import { api } from '../services/api';
 
 interface UsuarioAuth {
     nome: string;
@@ -11,7 +11,7 @@ interface UsuarioAuth {
 interface AuthContextType {
     usuario: UsuarioAuth | null;
     carregando: boolean;
-    login: (token: string) => Promise<void>;
+    login: () => Promise<void>;
     logout: () => Promise<void>;
     recarregar: () => void;
 }
@@ -28,44 +28,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [usuario, setUsuario] = useState<UsuarioAuth | null>(null);
     const [carregando, setCarregando] = useState(true);
 
-    const carregarUsuario = async () => {
-        if (!getToken()) {
-            setUsuario(null);
-            setCarregando(false);
-            return;
-        }
+    const aplicarUsuario = (data: UsuarioAuth) => {
+        setUsuario({
+            nome: data.nome,
+            email: data.email,
+            cargo: data.cargo,
+            escolaNome: data.escolaNome,
+        });
+    };
 
+    const carregarUsuario = async () => {
         try {
             const resp = await api.get('/usuario/me');
-            setUsuario({
-                nome: resp.data.nome,
-                email: resp.data.email,
-                cargo: resp.data.cargo,
-                escolaNome: resp.data.escolaNome,
-            });
+            aplicarUsuario(resp.data);
+            return true;
         } catch {
             setUsuario(null);
-            clearToken();
-        } finally {
-            setCarregando(false);
         }
+        return false;
     };
 
     useEffect(() => {
-        carregarUsuario();
+        let ativo = true;
+
+        const inicializarSessao = async () => {
+            await carregarUsuario();
+            if (ativo) {
+                setCarregando(false);
+            }
+        };
+
+        void inicializarSessao();
+
+        return () => {
+            ativo = false;
+        };
     }, []);
 
-    // NOVO: Função login — salva token E carrega usuário ANTES de retornar
-    const login = async (token: string) => {
-        setToken(token.replace('Bearer ', ''));
+    // Sessão baseada no cookie HttpOnly emitido pelo backend.
+    const login = async () => {
         await carregarUsuario();
     };
 
     const logout = async () => {
         try {
             await api.post('/usuario/logout');
-        } catch (e) {}
-        clearToken();
+        } catch {
+            // Logout remoto falhou, mas a limpeza local ainda precisa acontecer.
+        }
         setUsuario(null);
         window.location.href = '/';
     };

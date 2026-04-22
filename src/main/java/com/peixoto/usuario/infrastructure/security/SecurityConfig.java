@@ -60,6 +60,8 @@ public class SecurityConfig {
                         // Removido: .requestMatchers(HttpMethod.POST, "/usuario").permitAll()
 
                         // Autenticado
+                        .requestMatchers(HttpMethod.GET, "/usuario/email").hasAnyRole("ADMIN", "SEMED")
+                        .requestMatchers(HttpMethod.DELETE, "/usuario/email").hasAnyRole("ADMIN", "SEMED")
                         .requestMatchers(HttpMethod.GET, "/usuario/me").authenticated()
                         .requestMatchers(HttpMethod.POST, "/usuario/logout").authenticated()
                         .requestMatchers("/ficai-mensal/**").authenticated()

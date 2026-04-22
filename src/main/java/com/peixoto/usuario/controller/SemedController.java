@@ -109,14 +109,14 @@ public class SemedController {
 
             // O uso de \"%s\" (aspas duplas) garante que se alguém digitou uma vírgula no nome, o Excel não vai quebrar a coluna!
             csv.append(String.format("\"%s\",\"%s\",%d,\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n",
-                    aluno.getEscola(),
-                    aluno.getNomeCompleto(),
+                    sanitizeCsvCell(aluno.getEscola()),
+                    sanitizeCsvCell(aluno.getNomeCompleto()),
                     idade,
-                    aluno.getCor() != null ? aluno.getCor() : "Não Declarada",
-                    aluno.getEscolaridade() != null ? aluno.getEscolaridade() : "Não Informada",
-                    bairro,
+                    sanitizeCsvCell(aluno.getCor() != null ? aluno.getCor() : "Não Declarada"),
+                    sanitizeCsvCell(aluno.getEscolaridade() != null ? aluno.getEscolaridade() : "Não Informada"),
+                    sanitizeCsvCell(bairro),
                     temEvasao ? "SIM" : "NAO",
-                    aluno.getBeneficios() != null ? aluno.getBeneficios() : "Nenhum"
+                    sanitizeCsvCell(aluno.getBeneficios() != null ? aluno.getBeneficios() : "Nenhum")
             ));
         }
 
@@ -127,5 +127,18 @@ public class SemedController {
         headers.setContentDispositionFormData("attachment", "Relatorio_SEMED_OrdemAlfabetica.csv");
 
         return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
+    }
+
+    private String sanitizeCsvCell(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        String sanitized = value;
+        if (!sanitized.isEmpty() && "=+-@".indexOf(sanitized.charAt(0)) >= 0) {
+            sanitized = "'" + sanitized;
+        }
+
+        return sanitized;
     }
 }

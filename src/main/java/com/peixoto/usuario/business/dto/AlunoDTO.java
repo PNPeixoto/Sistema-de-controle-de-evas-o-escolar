@@ -1,16 +1,14 @@
 package com.peixoto.usuario.business.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import lombok.*;
 
 import java.util.List;
 import java.time.LocalDateTime;
-import com.fasterxml.jackson.annotation.JsonFormat;
-
-
-
 
 @Getter
 @Setter
@@ -32,10 +30,17 @@ public class AlunoDTO {
     private LocalDateTime dataNascimento;
 
     private String cor;
+
+    @Pattern(regexp = "M|F", message = "Sexo deve ser 'M' ou 'F'")
     private String sexo;
 
+    @Valid
     private List<FiliacaoDTO> filiacao;
+
+    @Valid
     private List<EnderecoDTO> enderecos;
+
+    @Valid
     private List<TelefoneDTO> telefones;
 
     private String escolaridade;
@@ -44,6 +49,7 @@ public class AlunoDTO {
     private Boolean defasagem;
     private String beneficios;
 
+    @Valid
     private List<OcorrenciaEvasaoDTO> historicoEvasao;
 
 }

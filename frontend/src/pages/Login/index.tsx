@@ -43,10 +43,8 @@ export default function Login() {
                 senhaIndividual: senhaIndividual
             });
 
-            // Aguarda salvar token E carregar dados do usuário ANTES de navegar
-            const token = resposta.data.token;
-            if (token) {
-                await login(token);
+            if (resposta.data?.status === 'authenticated') {
+                await login();
             }
 
             navigate('/dashboard');
