@@ -89,7 +89,9 @@ public class SecurityConfig {
         config.setAllowedOrigins(List.of(
                 "http://localhost:5173",
                 "https://sistema-de-controle-de-evas-o-escol-gamma.vercel.app",
-                "https://sistema-de-controle-de-evas-o-escol.vercel.app"
+                "https://sistema-de-controle-de-evas-o-escol.vercel.app",
+                "https://sistema-de-controle-de-evas-o-escolar-4paa7gab9.vercel.app",
+                "https://sistema-de-controle-git-05dc2b-pedro-peixotos-projects-1536bf9a.vercel.app"
         ));
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
