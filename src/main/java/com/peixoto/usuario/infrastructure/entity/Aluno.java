@@ -41,21 +41,21 @@ public class Aluno {
     // RELACIONAMENTOS (Com Exclusão em Cascata)
     // ==========================================
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JoinColumn(name = "aluno_id")
     private List<Endereco> enderecos;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JoinColumn(name = "aluno_id")
     private List<Filiacao> filiacao;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JoinColumn(name = "aluno_id")
     private List<OcorrenciaEvasao> historicoEvasao;
 
     // 👇 AQUI ESTÁ A CORREÇÃO DO ERRO!
     // Faltava avisar ao Java que o aluno tem telefones que devem ser apagados com ele
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JoinColumn(name = "aluno_id")
     private List<Telefone> telefones;
 }
