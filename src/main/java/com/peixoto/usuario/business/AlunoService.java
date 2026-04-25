@@ -70,6 +70,6 @@ public class AlunoService {
     // A MÁGICA ACONTECE AQUI: Guarda o retorno na memória RAM do servidor
     @Cacheable(value = "alunos_escola", key = "#escola")
     public List<Aluno> buscarTodosPorEscola(String escola) {
-        return alunoRepository.findByEscolaIgnoreCase(escola);
+        return alunoRepository.findByEscolaWithChildren(escola);
     }
 }

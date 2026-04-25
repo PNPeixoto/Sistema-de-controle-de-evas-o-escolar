@@ -1,10 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { getApiErrorMessage } from '../utils/http';
+
+interface StatusMes {
+    registrado?: boolean;
+    semFicai?: boolean;
+    assinadoPor?: string;
+    dataAssinatura?: string;
+}
 
 export default function FicaiMensalButton() {
     const { usuario } = useAuth();
-    const [statusMes, setStatusMes] = useState<any>(null);
+    const [statusMes, setStatusMes] = useState<StatusMes | null>(null);
     const [carregando, setCarregando] = useState(true);
     const [mostrarModal, setMostrarModal] = useState(false);
     const [termoAceito, setTermoAceito] = useState(false);
@@ -16,24 +24,24 @@ export default function FicaiMensalButton() {
     const nomeMes = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
     // Só verifica quando o usuário estiver carregado
-    useEffect(() => {
-        if (usuario) {
-            verificarMes();
-        } else {
-            setCarregando(false);
-        }
-    }, [usuario]);
-
-    const verificarMes = async () => {
+    const verificarMes = useCallback(async () => {
         try {
-            const resp = await api.get(`/ficai-mensal?mes=${mesAtual}`);
+            const resp = await api.get<StatusMes>(`/ficai-mensal?mes=${mesAtual}`);
             setStatusMes(resp.data);
         } catch (error) {
             console.error('Erro ao verificar FICAI mensal:', error);
             setStatusMes(null);
         }
         setCarregando(false);
-    };
+    }, [mesAtual]);
+
+    useEffect(() => {
+        if (usuario) {
+            void verificarMes();
+        } else {
+            setCarregando(false);
+        }
+    }, [usuario, verificarMes]);
 
     const registrarSemFicai = async () => {
         if (!termoAceito) {
@@ -49,14 +57,13 @@ export default function FicaiMensalButton() {
                 termoAceito: true
             });
             setSucesso('Declaração registrada com sucesso!');
-            verificarMes();
+            void verificarMes();
             setTimeout(() => {
                 setMostrarModal(false);
                 setSucesso('');
             }, 2000);
-        } catch (error: any) {
-            const msg = error.response?.data?.message || 'Erro ao registrar declaração.';
-            setErro(msg);
+        } catch (error: unknown) {
+            setErro(getApiErrorMessage(error, 'Erro ao registrar declaracao.'));
         } finally {
             setEnviando(false);
         }

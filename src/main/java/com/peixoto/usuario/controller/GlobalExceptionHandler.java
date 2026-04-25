@@ -1,7 +1,7 @@
 package com.peixoto.usuario.controller;
 
 import com.peixoto.usuario.infrastructure.exceptions.ConflictException;
-import com.peixoto.usuario.infrastructure.exceptions.IllegalArgumentException;
+import com.peixoto.usuario.infrastructure.exceptions.InvalidArgumentException;
 import com.peixoto.usuario.infrastructure.exceptions.ResourceNotFoundException;
 import com.peixoto.usuario.infrastructure.exceptions.UnauthorizedException;
 import com.peixoto.usuario.infrastructure.exceptions.dto.ErrorResponseDTO;
@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -40,8 +41,14 @@ public class GlobalExceptionHandler {
                 .body(buildError(401, ex.getMessage(), req.getRequestURI(), "Unauthorized"));
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponseDTO> handleBadRequest(IllegalArgumentException ex, HttpServletRequest req) {
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponseDTO> handleAccessDenied(AccessDeniedException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(buildError(403, "Acesso negado", req.getRequestURI(), "Forbidden"));
+    }
+
+    @ExceptionHandler(InvalidArgumentException.class)
+    public ResponseEntity<ErrorResponseDTO> handleBadRequest(InvalidArgumentException ex, HttpServletRequest req) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(buildError(400, ex.getMessage(), req.getRequestURI(), "Bad Request"));
     }

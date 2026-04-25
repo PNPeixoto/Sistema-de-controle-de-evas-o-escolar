@@ -1,28 +1,24 @@
 package com.peixoto.usuario.business;
 
 import com.peixoto.usuario.business.dto.FicaiMensalDTO;
-import com.peixoto.usuario.infrastructure.entity.Aluno;
 import com.peixoto.usuario.infrastructure.entity.FicaiMensal;
-import com.peixoto.usuario.infrastructure.entity.OcorrenciaEvasao;
 import com.peixoto.usuario.infrastructure.exceptions.ConflictException;
-import com.peixoto.usuario.infrastructure.exceptions.ResourceNotFoundException;
-import com.peixoto.usuario.infrastructure.repository.AlunoRepository;
+import com.peixoto.usuario.infrastructure.exceptions.InvalidArgumentException;
 import com.peixoto.usuario.infrastructure.repository.FicaiMensalRepository;
+import com.peixoto.usuario.infrastructure.repository.OcorrenciaEvasaoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class FicaiMensalService {
 
     private final FicaiMensalRepository ficaiMensalRepository;
-    private final AlunoRepository alunoRepository;
+    private final OcorrenciaEvasaoRepository ocorrenciaEvasaoRepository;
 
     /**
      * Registra que a escola NÃO possui FICAI neste mês.
@@ -36,7 +32,7 @@ public class FicaiMensalService {
 
         // 1. Validação: termo de consentimento aceito
         if (dto.getTermoAceito() == null || !dto.getTermoAceito()) {
-            throw new com.peixoto.usuario.infrastructure.exceptions.IllegalArgumentException(
+            throw new InvalidArgumentException(
                     "O termo de consentimento e responsabilidade deve ser aceito.");
         }
 
@@ -82,20 +78,8 @@ public class FicaiMensalService {
      * Compara o campo mesFaltas das ocorrências com o mês de referência.
      */
     private boolean existemEvasoesNoMes(String escolaNome, String mesReferencia) {
-        List<Aluno> alunos = alunoRepository.findByEscolaIgnoreCase(escolaNome);
-
-        for (Aluno aluno : alunos) {
-            if (aluno.getHistoricoEvasao() != null) {
-                for (OcorrenciaEvasao evasao : aluno.getHistoricoEvasao()) {
-                    if (evasao.getMesFaltas() != null &&
-                        evasao.getMesFaltas().toLowerCase().contains(
-                            mesReferenciaParaNomeMes(mesReferencia).toLowerCase())) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
+        String nomeMes = mesReferenciaParaNomeMes(mesReferencia);
+        return ocorrenciaEvasaoRepository.existeEvasaoNoMes(escolaNome, nomeMes);
     }
 
     /**

@@ -1,5 +1,5 @@
 import { useAuth } from '../../hooks/useAuth';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 
@@ -42,18 +42,20 @@ export default function RegistrarEvasao({ onClose }: { onClose?: () => void }) {
         { dataAcao: '', tipo: 'Contato Telefônico', observacao: '' }
     ]);
 
-    useEffect(() => {
-        buscarAlunos();
-    }, []);
+    const buscarAlunos = useCallback(async () => {
+        if (!escolaLogada) return;
 
-    const buscarAlunos = async () => {
         try {
-            const resposta = await api.get(`/aluno/escola/${encodeURIComponent(escolaLogada)}`);
+            const resposta = await api.get<{id: number, nomeCompleto: string}[]>(`/aluno/escola/${encodeURIComponent(escolaLogada)}`);
             setListaAlunos(resposta.data);
         } catch (error) {
             console.error("Erro ao buscar alunos", error);
         }
-    };
+    }, [escolaLogada]);
+
+    useEffect(() => {
+        void buscarAlunos();
+    }, [buscarAlunos]);
 
     const toggleProvidencia = (providencia: string) => {
         setEvasao(prev => {

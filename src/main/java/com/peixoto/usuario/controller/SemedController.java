@@ -2,12 +2,14 @@ package com.peixoto.usuario.controller;
 
 import com.peixoto.usuario.infrastructure.entity.Aluno;
 import com.peixoto.usuario.infrastructure.repository.AlunoRepository;
-import com.peixoto.usuario.infrastructure.security.AuthUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,96 +20,60 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/semed")
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('SEMED','ADMIN')")
 public class SemedController {
 
     private final AlunoRepository alunoRepository;
-    private final AuthUtils authUtils;
 
-    // Função interna para converter a Data de Nascimento em Idade
     private int calcularIdade(Aluno aluno) {
         if (aluno.getDataNascimento() == null) return 0;
         return Period.between(aluno.getDataNascimento().toLocalDate(), LocalDate.now()).getYears();
     }
 
-    // ==========================================
-    // 1. ENDPOINT PARA CONSULTA GERAL DE ALUNOS (SÓ SEMED)
-    // ==========================================
     @GetMapping("/alunos/todos")
-    public ResponseEntity<List<Aluno>> buscarTodosAlunosSemed() {
-        if (!authUtils.isSemed()) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        return ResponseEntity.ok(alunoRepository.findAll());
+    public ResponseEntity<Page<Aluno>> buscarTodosAlunosSemed(Pageable pageable) {
+        return ResponseEntity.ok(alunoRepository.findAll(pageable));
     }
 
-    // ==========================================
-    // 2. ENDPOINT DE ESTATÍSTICAS E FILTROS
-    // ==========================================
     @GetMapping("/estatisticas")
     public ResponseEntity<Map<String, Object>> getEstatisticasSemed() {
-        if (!authUtils.isSemed()) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-
-        List<Aluno> todosAlunos = alunoRepository.findAll();
-        // Filtramos apenas os alunos que têm FICAI (Evasão) para as estatísticas
-        List<Aluno> alunosComEvasao = todosAlunos.stream()
-                .filter(a -> a.getHistoricoEvasao() != null && !a.getHistoricoEvasao().isEmpty())
-                .toList();
-
         Map<String, Object> estatisticas = new HashMap<>();
-        estatisticas.put("totalEvasoes", alunosComEvasao.size());
-
-        // 1. Filtro por Escola
-        estatisticas.put("rankingEscolas", alunosComEvasao.stream()
-                .collect(Collectors.groupingBy(Aluno::getEscola, Collectors.counting())));
-
-        // 2. Filtro por Bairro
-        estatisticas.put("rankingBairros", alunosComEvasao.stream()
-                .filter(a -> a.getEnderecos() != null && !a.getEnderecos().isEmpty())
-                .collect(Collectors.groupingBy(a -> a.getEnderecos().get(0).getBairro(), Collectors.counting())));
-
-        // 3. Filtro por Idade
-        estatisticas.put("rankingIdades", alunosComEvasao.stream()
-                .collect(Collectors.groupingBy(this::calcularIdade, Collectors.counting())));
-
-        // 4. Filtro por Cor
-        estatisticas.put("rankingCor", alunosComEvasao.stream()
-                .collect(Collectors.groupingBy(a -> a.getCor() != null ? a.getCor() : "Não Informada", Collectors.counting())));
-
-        // 5. Filtro por Escolaridade
-        estatisticas.put("rankingEscolaridade", alunosComEvasao.stream()
-                .collect(Collectors.groupingBy(a -> a.getEscolaridade() != null ? a.getEscolaridade() : "Não Informada", Collectors.counting())));
-
+        estatisticas.put("totalEvasoes", alunoRepository.contarTotalEvasoes());
+        estatisticas.put("rankingEscolas", toMap(alunoRepository.contarEvasoesPorEscola()));
+        estatisticas.put("rankingBairros", toMap(alunoRepository.contarEvasoesPorBairro()));
+        estatisticas.put("rankingCor", toMap(alunoRepository.contarEvasoesPorCor()));
+        estatisticas.put("rankingEscolaridade", toMap(alunoRepository.contarEvasoesPorEscolaridade()));
         return ResponseEntity.ok(estatisticas);
     }
 
-    // ==========================================
-    // 3. EXPORTAR PLANILHA EXCEL COM ORDENAÇÃO E IDADE
-    // ==========================================
+    private Map<String, Long> toMap(List<Object[]> rows) {
+        Map<String, Long> result = new java.util.LinkedHashMap<>();
+        for (Object[] row : rows) {
+            String chave = row[0] != null ? row[0].toString() : "Não Informado";
+            Long total = ((Number) row[1]).longValue();
+            result.put(chave, total);
+        }
+        return result;
+    }
+
     @GetMapping("/exportar")
     public ResponseEntity<byte[]> exportarPlanilha() {
-        if (!authUtils.isSemed()) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-
-        List<Aluno> todosAlunos = alunoRepository.findAll();
-
-        // ORDENAÇÃO MÁGICA: Primeiro agrupa por Escola, e dentro da Escola, em Ordem Alfabética!
+        List<Aluno> todosAlunos = alunoRepository.findAllOrdered();
         todosAlunos.sort(Comparator.comparing(Aluno::getEscola).thenComparing(Aluno::getNomeCompleto));
 
         StringBuilder csv = new StringBuilder();
-        // Cabeçalho da Planilha
         csv.append("Escola,Nome do Aluno,Idade,Cor/Raca,Escolaridade,Bairro,Tem Evasao,Beneficios\n");
 
         for (Aluno aluno : todosAlunos) {
             boolean temEvasao = aluno.getHistoricoEvasao() != null && !aluno.getHistoricoEvasao().isEmpty();
             String bairro = (aluno.getEnderecos() != null && !aluno.getEnderecos().isEmpty())
                     ? aluno.getEnderecos().get(0).getBairro() : "Não Informado";
-
-            // Calculamos a idade em anos no momento da exportação
             int idade = calcularIdade(aluno);
 
-            // O uso de \"%s\" (aspas duplas) garante que se alguém digitou uma vírgula no nome, o Excel não vai quebrar a coluna!
             csv.append(String.format("\"%s\",\"%s\",%d,\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"\n",
                     sanitizeCsvCell(aluno.getEscola()),
                     sanitizeCsvCell(aluno.getNomeCompleto()),
@@ -120,8 +86,7 @@ public class SemedController {
             ));
         }
 
-        byte[] excelBytes = ("\ufeff" + csv.toString()).getBytes(); // BOM para acentos no Excel
-
+        byte[] excelBytes = ("\ufeff" + csv.toString()).getBytes();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType("text/csv"));
         headers.setContentDispositionFormData("attachment", "Relatorio_SEMED_OrdemAlfabetica.csv");
@@ -130,15 +95,11 @@ public class SemedController {
     }
 
     private String sanitizeCsvCell(String value) {
-        if (value == null) {
-            return "";
-        }
-
+        if (value == null) return "";
         String sanitized = value;
         if (!sanitized.isEmpty() && "=+-@".indexOf(sanitized.charAt(0)) >= 0) {
             sanitized = "'" + sanitized;
         }
-
-        return sanitized;
+        return sanitized.replace("\"", "\"\"");
     }
 }

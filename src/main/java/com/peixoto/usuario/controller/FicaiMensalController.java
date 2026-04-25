@@ -7,8 +7,8 @@ import com.peixoto.usuario.infrastructure.entity.Usuario;
 import com.peixoto.usuario.infrastructure.security.AuthUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -21,24 +21,19 @@ public class FicaiMensalController {
     private final FicaiMensalService ficaiMensalService;
     private final AuthUtils authUtils;
 
+    @PreAuthorize("hasAnyRole('DIRETOR','ASSISTENTE','SECRETARIA')")
     @PostMapping
     public ResponseEntity<FicaiMensal> registrarSemFicai(@Valid @RequestBody FicaiMensalDTO dto) {
-        if (authUtils.isSemed()) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        }
-
         Usuario usuario = authUtils.getUsuarioLogado();
-
         FicaiMensal registro = ficaiMensalService.registrarSemFicai(
                 usuario.getEscolaNome(), usuario.getNome(), dto);
-
         return ResponseEntity.ok(registro);
     }
 
+    @PreAuthorize("hasAnyRole('DIRETOR','ASSISTENTE','SECRETARIA','SEMED','ADMIN')")
     @GetMapping
     public ResponseEntity<Map<String, Object>> consultarMes(@RequestParam("mes") String mesReferencia) {
         Usuario usuario = authUtils.getUsuarioLogado();
-
         FicaiMensal registro = ficaiMensalService.consultarMes(usuario.getEscolaNome(), mesReferencia);
 
         if (registro == null) {

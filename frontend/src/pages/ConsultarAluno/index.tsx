@@ -1,6 +1,7 @@
 import { useAuth } from '../../hooks/useAuth';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../services/api';
+import { normalizeCollection, type CollectionResponse } from '../../utils/http';
 
 // (MANTENHA SUAS INTERFACES AQUI)
 interface AcaoTomada { id: number; dataAcao: string; descricao: string; }
@@ -21,9 +22,12 @@ export default function ConsultarAluno() {
     const { usuario } = useAuth();
     const escolaLogada = usuario?.escolaNome || '';
 
-    useEffect(() => { buscarAlunos(); }, []);
+    const buscarAlunos = useCallback(async () => {
+        if (!usuario) {
+            setCarregando(false);
+            return;
+        }
 
-    const buscarAlunos = async () => {
         try {
             setCarregando(true);
 
@@ -31,15 +35,28 @@ export default function ConsultarAluno() {
                 ? '/semed/alunos/todos'
                 : `/aluno/escola/${encodeURIComponent(escolaLogada)}`;
 
-            const resposta = await api.get(urlEndpoint);
-            setAlunos(resposta.data);
+            const resposta = await api.get<CollectionResponse<Aluno>>(urlEndpoint);
+            setAlunos(normalizeCollection(resposta.data));
             setErro('');
-        } catch (error: any) {
+        } catch {
             setErro('Erro ao buscar a lista de alunos.');
         } finally {
             setCarregando(false);
         }
-    };
+    }, [escolaLogada, usuario]);
+
+    useEffect(() => {
+        void buscarAlunos();
+    }, [buscarAlunos]);
+
+    useEffect(() => {
+        if (alunoSelecionado === null) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setAlunoSelecionado(null);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [alunoSelecionado]);
 
     // exclusão do aluno
     const handleExcluirAluno = async (id: number, nome: string) => {
@@ -48,7 +65,7 @@ export default function ConsultarAluno() {
                 await api.delete(`/aluno/${id}`);
                 alert('Aluno excluído com sucesso!');
                 buscarAlunos(); // Atualiza a lista na tela
-            } catch (error) {
+            } catch {
                 alert('Erro ao excluir. O servidor pode não estar permitindo exclusão em cascata no momento.');
             }
         }
@@ -68,7 +85,7 @@ export default function ConsultarAluno() {
             link.click();
             link.parentNode?.removeChild(link);
             window.URL.revokeObjectURL(url);
-        } catch (error) {
+        } catch {
             alert("Ocorreu um erro ao gerar o PDF da FICAI.");
         } finally {
             setBaixandoPdf(false);
@@ -130,7 +147,7 @@ export default function ConsultarAluno() {
                                 <td className="p-4 text-slate-600">{aluno.escolaridade}</td>
                                 <td className="p-4 text-center">
                                     {aluno.historicoEvasao && aluno.historicoEvasao.length > 0 ? (
-                                        <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold">🚨 ALERTA</span>
+                                        <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold"><span aria-hidden="true">🚨</span> ALERTA</span>
                                     ) : (
                                         <span className="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full text-xs font-semibold">Regular</span>
                                     )}
@@ -147,7 +164,6 @@ export default function ConsultarAluno() {
                                     >
                                         🗑️
                                     </button>
-                                    )
                                 </td>
                             </tr>
                         ))}
@@ -262,7 +278,7 @@ export default function ConsultarAluno() {
                                                                                 buscarAlunos();
                                                                                 setAlunoSelecionado(null);
                                                                                 alert('Frequência normalizada!');
-                                                                            } catch (err) {
+                                                                            } catch {
                                                                                 alert('Erro ao normalizar.');
                                                                             }
                                                                         }

@@ -1,11 +1,21 @@
 import { useState, useEffect, useMemo } from 'react';
 import { api } from '../../services/api';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import BarChartSimples, { type RankingEntry } from './BarChartSimples';
+import { normalizeCollection, type CollectionResponse } from '../../utils/http';
 
 const CORES = ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#F97316', '#EC4899'];
 
+interface AlunoBI {
+    escola?: string;
+    escolaridade?: string;
+    cor?: string;
+    enderecos?: { bairro?: string }[];
+    historicoEvasao?: unknown[];
+}
+
 export default function PainelSemed() {
-    const [alunosBrutos, setAlunosBrutos] = useState<any[]>([]);
+    const [alunosBrutos, setAlunosBrutos] = useState<AlunoBI[]>([]);
     const [carregando, setCarregando] = useState(true);
 
     // Filtros de cruzamento (PowerBI style)
@@ -19,8 +29,8 @@ export default function PainelSemed() {
     const carregarBaseCompleta = async () => {
         try {
             setCarregando(true);
-            const resp = await api.get('/semed/alunos/todos');
-            setAlunosBrutos(resp.data);
+            const resp = await api.get<CollectionResponse<AlunoBI>>('/semed/alunos/todos');
+            setAlunosBrutos(normalizeCollection(resp.data));
         } catch (error) {
             console.error("Erro ao puxar dados para o BI:", error);
         } finally {
@@ -66,7 +76,7 @@ export default function PainelSemed() {
         });
 
         // 2. Extrator genérico para os Rankings (Gráficos de Barra)
-        const gerarRanking = (extrator: (aluno: any) => string) => {
+        const gerarRanking = (extrator: (aluno: AlunoBI) => string): RankingEntry[] => {
             const contagem: Record<string, number> = {};
             filtrados.forEach(a => {
                 const chave = extrator(a);
@@ -75,7 +85,7 @@ export default function PainelSemed() {
             return Object.entries(contagem).sort((a, b) => b[1] - a[1]).slice(0, 6); // Top 6
         };
 
-        const gerarRankingCompleto = (extrator: (aluno: any) => string) => {
+        const gerarRankingCompleto = (extrator: (aluno: AlunoBI) => string): RankingEntry[] => {
             const contagem: Record<string, number> = {};
             filtrados.forEach(a => {
                 const chave = extrator(a);
@@ -87,15 +97,15 @@ export default function PainelSemed() {
         // 3. Listas para os Selects (Filtros)
         const todosEvasivos = alunosBrutos.filter(a => a.historicoEvasao && a.historicoEvasao.length > 0);
         const bairros = Array.from(new Set(todosEvasivos.map(a => a.enderecos?.[0]?.bairro || 'Sem Bairro'))).sort();
-        const escolaridades = Array.from(new Set(todosEvasivos.map(a => a.escolaridade))).sort();
+        const escolaridades = Array.from(new Set(todosEvasivos.map(a => a.escolaridade || 'Nao Informada'))).sort();
 
         return {
             alunosComEvasaoFiltrados: filtrados,
             totalEvasoes: filtrados.length,
-            rankingEscolas: gerarRanking(a => a.escola),
+            rankingEscolas: gerarRanking(a => a.escola || 'Nao Informada'),
             rankingBairros: gerarRanking(a => a.enderecos?.[0]?.bairro || 'Não Informado'),
             rankingCor: gerarRanking(a => a.cor || 'Não Declarada'),
-            chartEscolas: gerarRankingCompleto(a => a.escola).slice(0, 10).map(([nome, qtd]) => ({ nome: nome.length > 25 ? nome.substring(0, 25) + '…' : nome, qtd })),
+            chartEscolas: gerarRankingCompleto(a => a.escola || 'Nao Informada').slice(0, 10).map(([nome, qtd]) => ({ nome: nome.length > 25 ? nome.substring(0, 25) + '…' : nome, qtd })),
             chartBairros: gerarRankingCompleto(a => a.enderecos?.[0]?.bairro || 'Não Informado').slice(0, 10).map(([nome, qtd]) => ({ nome, qtd })),
             chartCor: gerarRankingCompleto(a => a.cor || 'Não Declarada').map(([name, value]) => ({ name, value })),
             bairrosDisponiveis: bairros as string[],
@@ -103,37 +113,6 @@ export default function PainelSemed() {
         };
     }, [alunosBrutos, filtroBairro, filtroEscolaridade]);
 
-
-    // COMPONENTE: Gráfico de Barras Horizontal (Feito com Tailwind)
-    const BarChartSimples = ({ titulo, dados, totalMax, icone, corBg, corBarra }: any) => (
-        <div className={`bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full`}>
-            <div className="flex items-center gap-2 mb-6">
-                <span className={`p-2 rounded-lg ${corBg}`}>{icone}</span>
-                <h3 className="text-lg font-bold text-slate-800">{titulo}</h3>
-            </div>
-
-            {dados.length === 0 ? (
-                <div className="text-center text-slate-400 my-auto text-sm">Sem dados para este filtro.</div>
-            ) : (
-                <div className="space-y-4 w-full">
-                    {dados.map(([label, valor]: any) => {
-                        const porcentagem = totalMax > 0 ? (valor / totalMax) * 100 : 0;
-                        return (
-                            <div key={label} className="w-full">
-                                <div className="flex justify-between text-sm mb-1">
-                                    <span className="font-semibold text-slate-700 truncate pr-2 max-w-[75%]">{label}</span>
-                                    <span className="font-bold text-slate-900">{valor}</span>
-                                </div>
-                                <div className="w-full bg-slate-100 rounded-full h-2.5">
-                                    <div className={`${corBarra} h-2.5 rounded-full transition-all duration-1000 ease-out`} style={{ width: `${porcentagem}%` }}></div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-        </div>
-    );
 
     if (carregando) return <div className="p-10 text-center text-slate-500 font-bold animate-pulse">⚙️ Processando o Cubo de Dados da SEMED...</div>;
 
@@ -147,13 +126,13 @@ export default function PainelSemed() {
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center relative z-10 gap-4">
                     <div>
                         <h2 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-                            📊 Inteligência de Evasão
+                            <span aria-hidden="true">📊</span> Inteligência de Evasão
                         </h2>
                         <p className="text-slate-400 mt-1">Análise cruzada de vulnerabilidade na rede.</p>
                     </div>
 
                     <button onClick={baixarExcel} className="bg-emerald-500 hover:bg-emerald-400 text-slate-900 px-6 py-3 rounded-xl font-black shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2 text-sm uppercase tracking-wide">
-                        ⬇ Exportar CSV
+                        <span aria-hidden="true">⬇</span> Exportar CSV
                     </button>
                 </div>
 
@@ -162,14 +141,14 @@ export default function PainelSemed() {
                     <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Filtrar por Bairro</label>
                         <select value={filtroBairro} onChange={e => setFiltroBairro(e.target.value)} className="w-full p-3 bg-slate-800 border border-slate-700 text-white rounded-xl focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer">
-                            <option value="">🗺️ Todos os Bairros</option>
+                            <option value="">Todos os Bairros</option>
                             {bairrosDisponiveis.map(b => <option key={b} value={b}>{b}</option>)}
                         </select>
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Filtrar por Etapa</label>
                         <select value={filtroEscolaridade} onChange={e => setFiltroEscolaridade(e.target.value)} className="w-full p-3 bg-slate-800 border border-slate-700 text-white rounded-xl focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer">
-                            <option value="">📚 Todas as Etapas</option>
+                            <option value="">Todas as Etapas</option>
                             {escolaridadesDisponiveis.map(e => <option key={e} value={e}>{e}</option>)}
                         </select>
                     </div>
@@ -234,9 +213,12 @@ export default function PainelSemed() {
                                     cx="50%"
                                     cy="50%"
                                     outerRadius={110}
-                                    label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                    label={(props: unknown) => {
+                                        const { name, percent } = props as { name?: string; percent?: number };
+                                        return `${name || ''} ${((percent || 0) * 100).toFixed(0)}%`;
+                                    }}
                                 >
-                                    {chartCor.map((_: any, idx: number) => (
+                                    {chartCor.map((_, idx) => (
                                         <Cell key={idx} fill={CORES[idx % CORES.length]} />
                                     ))}
                                 </Pie>

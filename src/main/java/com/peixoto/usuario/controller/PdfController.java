@@ -10,7 +10,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import com.peixoto.usuario.infrastructure.exceptions.ResourceNotFoundException;
 
 @RestController
 @RequestMapping("/relatorios")
@@ -21,13 +23,12 @@ public class PdfController {
     private final AlunoRepository alunoRepository;
     private final AuthUtils authUtils;
 
+    @PreAuthorize("hasAnyRole('DIRETOR','ASSISTENTE','SECRETARIA','SEMED','ADMIN')")
     @GetMapping("/ficai/{alunoId}/{evasaoId}")
     public ResponseEntity<byte[]> baixarFicai(@PathVariable Long alunoId, @PathVariable Long evasaoId) {
-
         Aluno aluno = alunoRepository.findById(alunoId)
-                .orElseThrow(() -> new RuntimeException("Aluno não encontrado com ID: " + alunoId));
+                .orElseThrow(() -> new ResourceNotFoundException("Aluno não encontrado: " + alunoId));
 
-        // Anti-IDOR
         if (!authUtils.pertenceAMinhaEscola(aluno.getEscola())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
@@ -35,7 +36,7 @@ public class PdfController {
         OcorrenciaEvasao evasao = aluno.getHistoricoEvasao().stream()
                 .filter(e -> e.getId().equals(evasaoId))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Evasão não encontrada com ID: " + evasaoId));
+                .orElseThrow(() -> new ResourceNotFoundException("Evasão não encontrada: " + evasaoId));
 
         byte[] relatorioPdf = ficaiPdfService.gerarFicaiPdf(aluno, evasao);
 

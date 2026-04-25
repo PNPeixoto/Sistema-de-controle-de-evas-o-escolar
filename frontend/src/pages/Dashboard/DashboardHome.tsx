@@ -1,8 +1,36 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import FicaiMensalButton from '../../components/FicaiMensalButton';
+import { calcularIdade, formatarData } from '../../utils/helpers';
+import { normalizeCollection, type CollectionResponse } from '../../utils/http';
+
+interface EnderecoResumo {
+    bairro?: string;
+}
+
+interface OcorrenciaResumo {
+    id: number;
+    mesFaltas?: string;
+    quantidadeFaltas?: number;
+    criadoEm?: string;
+    status?: string;
+    [key: string]: unknown;
+}
+
+interface AlunoDashboard {
+    id: number;
+    nomeCompleto: string;
+    escola?: string;
+    dataNascimento?: string;
+    enderecos?: EnderecoResumo[];
+    historicoEvasao?: OcorrenciaResumo[];
+}
+
+interface AtividadeDashboard extends OcorrenciaResumo {
+    alunoNome: string;
+}
 
 export default function DashboardHome() {
     const { usuario } = useAuth();
@@ -10,10 +38,10 @@ export default function DashboardHome() {
     const cargoLogado = usuario?.cargo || 'ESCOLA';
 
     const [carregando, setCarregando] = useState(true);
-    const [alunosBrutos, setAlunosBrutos] = useState<any[]>([]);
+    const [alunosBrutos, setAlunosBrutos] = useState<AlunoDashboard[]>([]);
 
-    const [alunosInfracoes, setAlunosInfracoes] = useState<any[]>([]);
-    const [alunosVisitas, setAlunosVisitas] = useState<any[]>([]);
+    const [alunosInfracoes, setAlunosInfracoes] = useState<AlunoDashboard[]>([]);
+    const [alunosVisitas, setAlunosVisitas] = useState<AlunoDashboard[]>([]);
 
     const [mostrarModalFicais, setMostrarModalFicais] = useState(false);
     const [mostrarModalVisitas, setMostrarModalVisitas] = useState(false);
@@ -25,38 +53,12 @@ export default function DashboardHome() {
         casosResolvidos: 0
     });
 
-    useEffect(() => {
-        if (usuario) carregarDadosDaApi();
-    }, [usuario]);
-
-    const carregarDadosDaApi = async () => {
-        try {
-            setCarregando(true);
-            let respostaAlunos;
-
-            if (cargoLogado === 'SEMED') {
-                respostaAlunos = await api.get('/semed/alunos/todos');
-            } else {
-                respostaAlunos = await api.get(`/aluno/escola/${encodeURIComponent(escolaLogada)}`);
-            }
-
-            const alunos = Array.isArray(respostaAlunos.data) ? respostaAlunos.data : [];
-            setAlunosBrutos(alunos);
-            processarEstatisticas(alunos);
-
-        } catch (error) {
-            console.error("Erro ao carregar estatísticas:", error);
-        } finally {
-            setCarregando(false);
-        }
-    };
-
-    const processarEstatisticas = (alunos: any[]) => {
-        const infrequentes: any[] = [];
-        const visitas: any[] = [];
+    const processarEstatisticas = useCallback((alunos: AlunoDashboard[]) => {
+        const infrequentes: AlunoDashboard[] = [];
+        const visitas: AlunoDashboard[] = [];
         let countResolvidas = 0;
 
-        alunos.forEach((aluno: any) => {
+        alunos.forEach((aluno) => {
             if (aluno.historicoEvasao && aluno.historicoEvasao.length > 0) {
                 const evasaoAtiva = aluno.historicoEvasao[0];
 
@@ -72,9 +74,11 @@ export default function DashboardHome() {
             }
         });
 
-        const ordenar = (a: any, b: any) => {
-            if (a.escola < b.escola) return -1;
-            if (a.escola > b.escola) return 1;
+        const ordenar = (a: AlunoDashboard, b: AlunoDashboard) => {
+            const escolaA = a.escola || '';
+            const escolaB = b.escola || '';
+            if (escolaA < escolaB) return -1;
+            if (escolaA > escolaB) return 1;
             return a.nomeCompleto.localeCompare(b.nomeCompleto);
         };
 
@@ -87,7 +91,46 @@ export default function DashboardHome() {
             visitasPendentes: visitas.length,
             casosResolvidos: countResolvidas
         });
-    };
+    }, []);
+
+    useEffect(() => {
+        const aberto = mostrarModalFicais || mostrarModalVisitas;
+        if (!aberto) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setMostrarModalFicais(false);
+                setMostrarModalVisitas(false);
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [mostrarModalFicais, mostrarModalVisitas]);
+
+    const carregarDadosDaApi = useCallback(async () => {
+        try {
+            setCarregando(true);
+            let alunos: AlunoDashboard[];
+            if (cargoLogado === 'SEMED') {
+                const respostaAlunos = await api.get<CollectionResponse<AlunoDashboard>>('/semed/alunos/todos');
+                alunos = normalizeCollection(respostaAlunos.data);
+            } else {
+                const respostaAlunos = await api.get<CollectionResponse<AlunoDashboard>>(`/aluno/escola/${encodeURIComponent(escolaLogada)}`);
+                alunos = normalizeCollection(respostaAlunos.data);
+            }
+
+            setAlunosBrutos(alunos);
+            processarEstatisticas(alunos);
+
+        } catch (error) {
+            console.error("Erro ao carregar estatísticas:", error);
+        } finally {
+            setCarregando(false);
+        }
+    }, [cargoLogado, escolaLogada, processarEstatisticas]);
+
+    useEffect(() => {
+        if (usuario) void carregarDadosDaApi();
+    }, [usuario, carregarDadosDaApi]);
 
     const marcarComoResolvido = async (evasaoId: number) => {
         if (window.confirm('Tem certeza que a frequência deste aluno foi normalizada?')) {
@@ -103,22 +146,17 @@ export default function DashboardHome() {
         }
     };
 
-    const formatarData = (iso?: string) => {
-        if (!iso) return '—';
-        const d = new Date(iso);
-        if (isNaN(d.getTime())) return iso;
-        return d.toLocaleDateString('pt-BR');
-    };
-
     const ultimasAtividades = alunosBrutos
-        .filter(a => a.historicoEvasao?.length > 0)
-        .flatMap(a => a.historicoEvasao.map((e: any) => ({ ...e, alunoNome: a.nomeCompleto })))
-        .sort((a: any, b: any) => (b.criadoEm || '').localeCompare(a.criadoEm || ''))
+        .filter(a => (a.historicoEvasao?.length || 0) > 0)
+        .flatMap((a): AtividadeDashboard[] => (a.historicoEvasao || []).map((e) => ({ ...e, alunoNome: a.nomeCompleto })))
+        .sort((a, b) => (b.criadoEm || '').localeCompare(a.criadoEm || ''))
         .slice(0, 5);
 
-    const calcularIdade = (data: string) => {
-        if (!data) return 'N/I';
-        return new Date().getFullYear() - new Date(data).getFullYear();
+    const resolverPrimeiraEvasao = (aluno: AlunoDashboard) => {
+        const evasaoId = aluno.historicoEvasao?.[0]?.id;
+        if (evasaoId) {
+            void marcarComoResolvido(evasaoId);
+        }
     };
 
     return (
@@ -134,7 +172,7 @@ export default function DashboardHome() {
                 <div className="bg-white p-7 rounded-2xl shadow-sm border border-slate-200 group hover:border-blue-300 transition-colors">
                     <div className="flex items-center justify-between">
                         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Alunos Registrados</p>
-                        <span className="text-2xl opacity-70 group-hover:opacity-100 transition">&#x1F465;</span>
+                        <span aria-hidden="true" className="text-2xl opacity-70 group-hover:opacity-100 transition">&#x1F465;</span>
                     </div>
                     <p className="text-5xl font-black text-slate-900 mt-4 tracking-tighter">
                         {carregando ? '...' : estatisticas.alunosMatriculados.toLocaleString('pt-BR')}
@@ -148,7 +186,7 @@ export default function DashboardHome() {
                 >
                     <div className="flex items-center justify-between">
                         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">FICAIs Abertas</p>
-                        <span className="text-2xl opacity-70 group-hover:opacity-100 transition">&#x1F6A8;</span>
+                        <span aria-hidden="true" className="text-2xl opacity-70 group-hover:opacity-100 transition">&#x1F6A8;</span>
                     </div>
                     <p className="text-5xl font-black text-red-600 mt-4 tracking-tighter">
                         {carregando ? '...' : estatisticas.ficiaisAbertas.toLocaleString('pt-BR')}
@@ -164,7 +202,7 @@ export default function DashboardHome() {
                 >
                     <div className="flex items-center justify-between">
                         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Visitas Pendentes</p>
-                        <span className="text-2xl opacity-70 group-hover:opacity-100 transition">&#x1F3E0;</span>
+                        <span aria-hidden="true" className="text-2xl opacity-70 group-hover:opacity-100 transition">&#x1F3E0;</span>
                     </div>
                     <p className="text-5xl font-black text-yellow-600 mt-4 tracking-tighter">
                         {carregando ? '...' : estatisticas.visitasPendentes.toLocaleString('pt-BR')}
@@ -177,7 +215,7 @@ export default function DashboardHome() {
                 <div className="bg-white p-7 rounded-2xl shadow-sm border border-slate-200 group hover:border-green-300 transition-colors">
                     <div className="flex items-center justify-between">
                         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Casos Resolvidos</p>
-                        <span className="text-2xl opacity-70 group-hover:opacity-100 transition">&#x2705;</span>
+                        <span aria-hidden="true" className="text-2xl opacity-70 group-hover:opacity-100 transition">&#x2705;</span>
                     </div>
                     <p className="text-5xl font-black text-green-600 mt-4 tracking-tighter">
                         {carregando ? '...' : estatisticas.casosResolvidos.toLocaleString('pt-BR')}
@@ -196,7 +234,7 @@ export default function DashboardHome() {
                             </div>
                         ) : (
                             <ul className="divide-y divide-slate-100">
-                                {ultimasAtividades.map((atv: any) => {
+                                {ultimasAtividades.map((atv) => {
                                     const status = atv.status || 'ABERTA';
                                     const resolvida = status === 'RESOLVIDA';
                                     return (
@@ -261,7 +299,7 @@ export default function DashboardHome() {
                                         <td className="px-5 py-4 text-center text-slate-600">{calcularIdade(aluno.dataNascimento)} anos</td>
                                         <td className="px-5 py-4 text-slate-600 max-w-[200px] truncate">{aluno.enderecos?.[0]?.bairro || 'N/I'}</td>
                                         <td className="px-5 py-4 text-center">
-                                            <button onClick={() => marcarComoResolvido(aluno.historicoEvasao[0].id)}
+                                            <button onClick={() => resolverPrimeiraEvasao(aluno)}
                                                 className="bg-green-100 hover:bg-green-600 text-green-700 hover:text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors shadow-sm">
                                                 Normalizar
                                             </button>

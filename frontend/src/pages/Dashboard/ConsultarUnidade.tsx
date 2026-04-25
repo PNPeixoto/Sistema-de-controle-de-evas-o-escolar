@@ -6,9 +6,11 @@ import { api } from '../../services/api';
 // ==========================================
 interface Bairro { id: number; nome: string; }
 interface Escola { id: number; nome: string; bairro?: Bairro; }
+interface Filiacao { mae?: string; pai?: string; responsavel?: string; telefoneResponsavel?: string; }
+interface HistoricoEvasao { id: number; status?: string; }
 interface Aluno {
     id: number; nomeCompleto: string; escolaridade: string; dataNascimento: string; cor: string;
-    aee: boolean; turno: string; beneficios: string; filiacao: any[]; historicoEvasao: any[];
+    aee: boolean; turno: string; beneficios: string; filiacao: Filiacao[]; historicoEvasao: HistoricoEvasao[];
 }
 
 export default function ConsultarUnidade() {
@@ -29,10 +31,19 @@ export default function ConsultarUnidade() {
         carregarTodasAsEscolas();
     }, []);
 
+    useEffect(() => {
+        if (alunoSelecionado === null) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setAlunoSelecionado(null);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [alunoSelecionado]);
+
     const carregarTodasAsEscolas = async () => {
         try {
             setCarregandoEscolas(true);
-            const resposta = await api.get('/escolas');
+            const resposta = await api.get<Escola[]>('/escolas');
             setEscolas(Array.isArray(resposta.data) ? resposta.data : []);
         } catch (error) {
             console.error("Erro:", error);
@@ -46,10 +57,10 @@ export default function ConsultarUnidade() {
     const abrirEscola = async (nomeEscola: string) => {
         try {
             setCarregandoAlunos(true);
-            const resposta = await api.get(`/aluno/escola/${encodeURIComponent(nomeEscola)}`);
+            const resposta = await api.get<Aluno[]>(`/aluno/escola/${encodeURIComponent(nomeEscola)}`);
             setAlunosSemed(Array.isArray(resposta.data) ? resposta.data : []);
             setEscolaAtiva(nomeEscola);
-        } catch (error) {
+        } catch {
             alert("Erro ao acessar dados.");
         } finally {
             setCarregandoAlunos(false);
@@ -84,7 +95,7 @@ export default function ConsultarUnidade() {
                 setFiciaisBaixadas([...ficiaisBaixadas, evasaoId]);
             }
 
-        } catch (error) {
+        } catch {
             alert("Erro ao baixar. O servidor não encontrou o arquivo.");
         }
     };
@@ -94,13 +105,13 @@ export default function ConsultarUnidade() {
             try {
                 await api.put(`/evasao/${evasaoId}/resolver`);
                 if (escolaAtiva) {
-                    const resposta = await api.get(`/aluno/escola/${encodeURIComponent(escolaAtiva)}`);
+                    const resposta = await api.get<Aluno[]>(`/aluno/escola/${encodeURIComponent(escolaAtiva)}`);
                     const lista = Array.isArray(resposta.data) ? resposta.data : [];
                     setAlunosSemed(lista);
-                    const atual = lista.find((a: Aluno) => a.id === alunoSelecionado?.id);
+                    const atual = lista.find((a) => a.id === alunoSelecionado?.id);
                     setAlunoSelecionado(atual || null);
                 }
-            } catch (err) {
+            } catch {
                 alert('Erro ao normalizar.');
             }
         }

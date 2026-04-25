@@ -8,27 +8,35 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.web.header.writers.XXssProtectionHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true) // ← ATIVA @PreAuthorize
 public class SecurityConfig {
 
     @Value("${app.security.pepper}")
     private String pepper;
+
+    @Value("${app.cors.allowed-origins:}")
+    private String allowedOrigins;
 
     private final JwtUtil jwtUtil;
     private final UserDetailsService userDetailsService;
@@ -48,35 +56,40 @@ public class SecurityConfig {
 
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(AbstractHttpConfigurer::disable)
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(csrfTokenRepository())
+                        .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
+                        .ignoringRequestMatchers("/usuario/login/**", "/error")
+                )
+                .headers(headers -> headers
+                        .xssProtection(xss -> xss.headerValue(XXssProtectionHeaderWriter.HeaderValue.ENABLED_MODE_BLOCK))
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(
+                                "default-src 'self'; " +
+                                "script-src 'self'; " +
+                                "style-src 'self' 'unsafe-inline'; " +
+                                "img-src 'self' data: blob:; " +
+                                "connect-src 'self'; " +
+                                "font-src 'self' data:; " +
+                                "frame-ancestors 'none'"
+                        ))
+                        .frameOptions(frame -> frame.deny())
+                        .contentTypeOptions(cto -> {})
+                        .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
+                        .referrerPolicy(ref -> ref.policy(
+                                org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter
+                                        .ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN
+                        ))
+                )
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-
-                        // Público: somente login
                         .requestMatchers("/usuario/login/**").permitAll()
                         .requestMatchers("/error").permitAll()
-
-                        // CORREÇÃO: POST /usuario agora exige autenticação (só ADMIN/SEMED cria usuários)
-                        // Removido: .requestMatchers(HttpMethod.POST, "/usuario").permitAll()
-
-                        // Autenticado
-                        .requestMatchers(HttpMethod.GET, "/usuario/email").hasAnyRole("ADMIN", "SEMED")
-                        .requestMatchers(HttpMethod.DELETE, "/usuario/email").hasAnyRole("ADMIN", "SEMED")
-                        .requestMatchers(HttpMethod.GET, "/usuario/me").authenticated()
-                        .requestMatchers(HttpMethod.POST, "/usuario/logout").authenticated()
-                        .requestMatchers("/ficai-mensal/**").authenticated()
-                        .requestMatchers("/evasao/**").authenticated()
-                        .requestMatchers("/aluno/**").authenticated()
-                        .requestMatchers("/semed/**").authenticated()
-                        .requestMatchers("/relatorios/**").authenticated()
-                        .requestMatchers("/bairros/**").authenticated()
-                        .requestMatchers("/escolas/**").authenticated()
-                        .requestMatchers("/usuario/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
+                .addFilterAfter(new CsrfCookieFilter(csrfTokenRepository()), CsrfFilter.class)
                 .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -85,17 +98,9 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-
-        config.setAllowedOrigins(List.of(
-                "http://localhost:5173",
-                "https://sistema-de-controle-de-evas-o-escol-gamma.vercel.app",
-                "https://sistema-de-controle-de-evas-o-escol.vercel.app",
-                "https://sistema-de-controle-de-evas-o-escolar-4paa7gab9.vercel.app",
-                "https://sistema-de-controle-git-05dc2b-pedro-peixotos-projects-1536bf9a.vercel.app"
-        ));
-
+        config.setAllowedOrigins(parseAllowedOrigins());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "X-XSRF-TOKEN"));
         config.setAllowCredentials(true);
         config.setExposedHeaders(List.of("Set-Cookie"));
         config.setMaxAge(3600L);
@@ -103,6 +108,21 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
+    }
+
+    private List<String> parseAllowedOrigins() {
+        if (allowedOrigins == null || allowedOrigins.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isBlank())
+                .toList();
+    }
+
+    @Bean
+    public CookieCsrfTokenRepository csrfTokenRepository() {
+        return CookieCsrfTokenRepository.withHttpOnlyFalse();
     }
 
     @Bean

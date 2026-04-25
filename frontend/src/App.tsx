@@ -1,5 +1,5 @@
 import { Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './hooks/useAuth';
+import { AuthProvider } from './components/AuthProvider';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 import Login from './pages/Login';
@@ -16,6 +16,7 @@ export default function App() {
         <AuthProvider>
             <Routes>
                 <Route path="/" element={<Login />} />
+                <Route path="/login" element={<Login />} />
 
                 <Route path="/dashboard" element={
                     <ProtectedRoute>

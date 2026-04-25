@@ -4,6 +4,7 @@ import com.peixoto.usuario.business.UsuarioService;
 import com.peixoto.usuario.business.dto.LoginEtapa1DTO;
 import com.peixoto.usuario.business.dto.LoginEtapa2DTO;
 import com.peixoto.usuario.business.dto.UsuarioDTO;
+import com.peixoto.usuario.infrastructure.entity.Cargo;
 import com.peixoto.usuario.infrastructure.exceptions.UnauthorizedException;
 import com.peixoto.usuario.infrastructure.security.LoginStepChallengeService;
 import com.peixoto.usuario.infrastructure.security.RateLimitService;
@@ -18,6 +19,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -37,29 +39,22 @@ public class UsuarioController {
     @Value("${app.security.cookie-secure:true}")
     private boolean cookieSecure;
 
-    // ==========================================
-    // CADASTRO — SOMENTE ADMIN PODE CRIAR USUÁRIOS
-    // ==========================================
-    @PostMapping
-    public ResponseEntity<UsuarioDTO> salvaUsuario(@Valid @RequestBody UsuarioDTO usuarioDTO) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    @Value("${app.security.trust-forwarded-headers:false}")
+    private boolean trustForwardedHeaders;
 
-        // Se não estiver autenticado ou não for ADMIN/SEMED → bloqueia
-        if (auth == null || auth.getAuthorities().stream().noneMatch(r ->
-                r.getAuthority().equals("ROLE_ADMIN") || r.getAuthority().equals("ROLE_SEMED"))) {
+    @PreAuthorize("hasAnyRole('ADMIN','SEMED')")
+    @PostMapping
+    public ResponseEntity<UsuarioDTO> salvaUsuario(@Valid @RequestBody UsuarioDTO usuarioDTO,
+                                                   Authentication authentication) {
+        if (isAdministrativeCargo(usuarioDTO.getCargo()) && !hasRole(authentication, "ROLE_ADMIN")) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-
         return ResponseEntity.ok(usuarioService.salvaUsuario(usuarioDTO));
     }
 
-    // ==========================================
-    // LOGIN EM 2 ETAPAS (com Rate Limiting separado)
-    // ==========================================
     @PostMapping("/login/etapa1")
     public ResponseEntity<Map<String, String>> loginEtapa1(@Valid @RequestBody LoginEtapa1DTO dto,
-                                                            HttpServletRequest request,
-                                                            HttpServletResponse response) {
+                                                           HttpServletRequest request, HttpServletResponse response) {
         String ip = getClientIp(request);
         String key = "etapa1:" + ip;
 
@@ -72,12 +67,8 @@ public class UsuarioController {
             String challengeToken = loginStepChallengeService.issueChallenge(dto.email(), ip);
 
             ResponseCookie stageOneCookie = ResponseCookie.from("pnp_login_stage1", challengeToken)
-                    .httpOnly(true)
-                    .secure(cookieSecure)
-                    .path("/")
-                    .maxAge(5 * 60)
-                    .sameSite(cookieSecure ? "None" : "Lax")
-                    .build();
+                    .httpOnly(true).secure(cookieSecure).path("/").maxAge(5 * 60)
+                    .sameSite(cookieSecure ? "None" : "Lax").build();
 
             rateLimitService.resetAttempts(key);
             response.addHeader(HttpHeaders.SET_COOKIE, stageOneCookie.toString());
@@ -90,8 +81,7 @@ public class UsuarioController {
 
     @PostMapping("/login/etapa2")
     public ResponseEntity<Map<String, String>> loginEtapa2(@Valid @RequestBody LoginEtapa2DTO dto,
-                                                            HttpServletRequest request,
-                                                            HttpServletResponse response) {
+                                                           HttpServletRequest request, HttpServletResponse response) {
         String ip = getClientIp(request);
         String key = "etapa2:" + ip + ":" + dto.email();
         String stageOneToken = getCookieValue(request, "pnp_login_stage1");
@@ -102,7 +92,7 @@ public class UsuarioController {
 
         if (!loginStepChallengeService.isValid(stageOneToken, dto.email(), ip)) {
             rateLimitService.recordAttempt(key);
-            throw new UnauthorizedException("Etapa 1 do login expirou ou não foi concluída. Reinicie o acesso.");
+            throw new UnauthorizedException("Etapa 1 do login expirou ou não foi concluída.");
         }
 
         try {
@@ -110,12 +100,9 @@ public class UsuarioController {
             String tokenPuro = tokenComBearer.replace("Bearer ", "");
 
             ResponseCookie cookie = ResponseCookie.from("pnp_token", tokenPuro)
-                    .httpOnly(true)
-                    .secure(cookieSecure)
-                    .path("/")
-                    .maxAge(2 * 60 * 60)
-                    .sameSite(cookieSecure ? "None" : "Lax")
-                    .build();
+                    .httpOnly(true).secure(cookieSecure).path("/").maxAge(2 * 60 * 60)
+                    .sameSite(cookieSecure ? "None" : "Lax").build();
+
             loginStepChallengeService.consume(stageOneToken);
             response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
             response.addHeader(HttpHeaders.SET_COOKIE, expireCookie("pnp_login_stage1"));
@@ -128,12 +115,14 @@ public class UsuarioController {
         }
     }
 
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/me")
     public ResponseEntity<UsuarioDTO> getUsuarioLogado() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return ResponseEntity.ok(usuarioService.buscarUsuarioPorEmail(auth.getName()));
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
         if (request.getCookies() != null) {
@@ -157,51 +146,55 @@ public class UsuarioController {
         return ResponseEntity.ok().build();
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN','SEMED')")
     @GetMapping("/email")
     public ResponseEntity<UsuarioDTO> buscaUsuarioPorEmail(@RequestParam("email") String email) {
         return ResponseEntity.ok(usuarioService.buscarUsuarioPorEmail(email));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN','SEMED')")
     @DeleteMapping("/email")
     public ResponseEntity<Void> deletaUsuarioPorEmail(@RequestParam("email") String email) {
         usuarioService.deletaUsuarioPorEmail(email);
         return ResponseEntity.ok().build();
     }
 
+    @PreAuthorize("isAuthenticated()")
     @PutMapping
-    public ResponseEntity<UsuarioDTO> atualizDadoUsuario(@Valid @RequestBody UsuarioDTO dto,
-                                                         @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
-        // Mantido por compatibilidade com clientes antigos; a identidade vem do contexto autenticado.
+    public ResponseEntity<UsuarioDTO> atualizDadoUsuario(@Valid @RequestBody UsuarioDTO dto) {
         return ResponseEntity.ok(usuarioService.atualizaDadosUsuario(dto));
     }
 
     private String getClientIp(HttpServletRequest request) {
-        String xff = request.getHeader("X-Forwarded-For");
-        return (xff != null && !xff.isEmpty()) ? xff.split(",")[0].trim() : request.getRemoteAddr();
+        if (trustForwardedHeaders) {
+            String xff = request.getHeader("X-Forwarded-For");
+            if (xff != null && !xff.isEmpty()) {
+                return xff.split(",")[0].trim();
+            }
+        }
+        return request.getRemoteAddr();
+    }
+
+    private boolean isAdministrativeCargo(Cargo cargo) {
+        return cargo == Cargo.ADMIN || cargo == Cargo.SEMED;
+    }
+
+    private boolean hasRole(Authentication authentication, String role) {
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> role.equals(authority.getAuthority()));
     }
 
     private String getCookieValue(HttpServletRequest request, String cookieName) {
-        if (request.getCookies() == null) {
-            return null;
-        }
-
+        if (request.getCookies() == null) return null;
         for (Cookie cookie : request.getCookies()) {
-            if (cookieName.equals(cookie.getName())) {
-                return cookie.getValue();
-            }
+            if (cookieName.equals(cookie.getName())) return cookie.getValue();
         }
-
         return null;
     }
 
     private String expireCookie(String cookieName) {
         return ResponseCookie.from(cookieName, "")
-                .httpOnly(true)
-                .secure(cookieSecure)
-                .path("/")
-                .maxAge(0)
-                .sameSite(cookieSecure ? "None" : "Lax")
-                .build()
-                .toString();
+                .httpOnly(true).secure(cookieSecure).path("/").maxAge(0)
+                .sameSite(cookieSecure ? "None" : "Lax").build().toString();
     }
 }

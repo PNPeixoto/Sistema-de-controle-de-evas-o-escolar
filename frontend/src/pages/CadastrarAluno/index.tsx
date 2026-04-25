@@ -1,6 +1,7 @@
 import { useAuth } from '../../hooks/useAuth';
 import { useState, useEffect } from 'react';
 import { api } from '../../services/api';
+import { getApiErrorMessage } from '../../utils/http';
 
 interface Bairro {
     id: number;
@@ -141,8 +142,8 @@ export default function CadastrarAluno() {
             await api.post('/aluno', payload);
             alert('Aluno matriculado com sucesso no sistema escolar!');
             window.location.reload();
-        } catch (error: any) {
-            alert(error.response?.data?.message || 'Erro ao salvar aluno. Verifique os dados e o console.');
+        } catch (error: unknown) {
+            alert(getApiErrorMessage(error, 'Erro ao salvar aluno. Verifique os dados e o console.'));
             console.error(error);
         } finally {
             setCarregando(false);
